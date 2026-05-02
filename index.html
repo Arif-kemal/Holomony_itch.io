@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PortalTop — Oyun</title>
+  <style>
+    /* =============================================
+       GENEL SAYFA STİLİ
+       Canvas tam ekranı kaplamalı, kaydırma çubuğu olmamalı
+    ============================================= */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0a0a0f;       /* Çok koyu lacivert-siyah arka plan */
+      overflow: hidden;           /* Kaydırma çubuğunu gizle */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-family: 'Courier New', monospace; /* Retro oyun fontu */
+    }
+
+    /* Ana canvas elementi — oyun buraya çizilecek */
+    #oyunCanvas {
+      display: block;
+      background: #0d0d1a;        /* Oyun alanı arka planı */
+      border: 2px solid #2a2a4a;  /* İnce çerçeve */
+      box-shadow: 0 0 40px rgba(100, 80, 255, 0.3); /* Mor ışıma efekti */
+    }
+
+    /* =============================================
+       HUD (Heads-Up Display) — Ekrandaki bilgi paneli
+       Canvas'ın üzerine gelecek şekilde konumlandırıldı
+    ============================================= */
+    #hud {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 32px;
+      background: rgba(10, 10, 20, 0.85);
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      padding: 8px 24px;
+      color: #c0b8ff;
+      font-size: 14px;
+      letter-spacing: 2px;
+      z-index: 10;               /* Canvas'ın önünde görünsün */
+      pointer-events: none;      /* Tıklamayı engellemesin */
+    }
+
+    #hud span { color: #ffffff; font-weight: bold; }
+
+    /* =============================================
+       EKRANLAR — Başlangıç, Duraklatma, Oyun Bitti
+       Bunlar canvas'ın üzerine katman olarak geliyor
+    ============================================= */
+    .ekran {
+      position: fixed;
+      inset: 0;                  /* top/right/bottom/left hepsini 0 yap */
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      background: rgba(5, 5, 15, 0.92);
+      z-index: 20;
+      color: white;
+      text-align: center;
+    }
+
+    /* Gizli ekranlar için yardımcı sınıf */
+    .gizli { display: none; }
+
+    .ekran h1 {
+      font-size: 48px;
+      color: #a090ff;
+      text-shadow: 0 0 20px rgba(160, 144, 255, 0.6);
+      margin-bottom: 8px;
+    }
+
+    .ekran p {
+      font-size: 16px;
+      color: #888;
+      max-width: 400px;
+      line-height: 1.6;
+    }
+
+    /* Buton stili */
+    .buton {
+      margin-top: 12px;
+      padding: 12px 36px;
+      background: transparent;
+      border: 2px solid #7060dd;
+      color: #a090ff;
+      font-size: 16px;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 3px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .buton:hover {
+      background: #7060dd;
+      color: white;
+      box-shadow: 0 0 20px rgba(112, 96, 221, 0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =============================================
+       BAŞLANGIÇ EKRANI
+       Oyun ilk açıldığında görünür
+  ============================================= -->
+  <div id="baslangicEkrani" class="ekran">
+    <h1>⬡ PORTAL TOP</h1>
+    <p>Topu dönen kapılardan geçirerek hedefe ulaştır.<br>Her kapıdan geçişte topun yönü değişir!</p>
+    <p style="color:#555; font-size:13px;">
+      🖱️ Fare ile nişan al — Tıkla ve sürükle fırlat<br>
+      ⌨️ R → Seviyeyi yeniden başlat &nbsp;|&nbsp; ESC → Duraklat
+    </p>
+    <button class="buton" id="baslatButon">BAŞLAT</button>
+  </div>
+
+  <!-- =============================================
+       DURAKLATMA EKRANI
+       ESC tuşuna basınca görünür
+  ============================================= -->
+  <div id="duraklatilaEkrani" class="ekran gizli">
+    <h1 style="font-size:36px;">⏸ DURAKLANDI</h1>
+    <button class="buton" id="devamButon">DEVAM ET</button>
+  </div>
+
+  <!-- =============================================
+       OYUN BİTTİ EKRANI
+       Top hedefe ulaşınca veya deneme bitince görünür
+  ============================================= -->
+  <div id="oyunBittiEkrani" class="ekran gizli">
+    <h1 id="bitisBaslik">TEBRİKLER!</h1>
+    <p id="bitisMesaj">Seviyeyi tamamladın!</p>
+    <button class="buton" id="tekrarButon">TEKRAR OYNA</button>
+  </div>
+
+  <!-- =============================================
+       HUD — Oyun içi bilgi göstergesi
+       Seviye numarası ve kalan hamle sayısı
+  ============================================= -->
+  <div id="hud" class="gizli">
+    SEVİYE: <span id="seviyeNo">1</span>
+    &nbsp;&nbsp;
+    HAMLE: <span id="hamleNo">3</span>
+  </div>
+
+  <!-- =============================================
+       CANVAS — Oyunun çizildiği alan
+       Tüm oyun grafikleri buraya render edilir
+  ============================================= -->
+  <canvas id="oyunCanvas"></canvas>
+
+  <!-- =============================================
+       SES DOSYALARI
+       Arkaplan müziği ve aksiyon sesleri için
+       TODO: ses dosyalarını proje klasörüne ekle
+             ve src alanlarını güncelle
+  ============================================= -->
+  <audio id="muzik" loop>
+    <!-- TODO: kendi müzik dosyanı buraya ekle -->
+    <!-- <source src="ses/muzik.mp3" type="audio/mpeg"> -->
+  </audio>
+
+  <audio id="gecisEfekt">
+    <!-- TODO: kapıdan geçiş sesini buraya ekle -->
+    <!-- <source src="ses/gecis.mp3" type="audio/mpeg"> -->
+  </audio>
+
+  <audio id="hedefEfekt">
+    <!-- TODO: hedefe ulaşma sesini buraya ekle -->
+    <!-- <source src="ses/hedef.mp3" type="audio/mpeg"> -->
+  </audio>
+
+
+  <!-- =============================================
+       JAVASCRIPT — Oyunun beyni
+       Tüm oyun mantığı aşağıda başlıyor
+  ============================================= -->
+  <script>
+
+    // ============================================
+    // 1. CANVAS KURULUMU
+    // Canvas elementini ve 2D çizim bağlamını al
+    // ctx = tüm çizim komutlarının çalıştığı nesne
+    // ============================================
+    const canvas = document.getElementById('oyunCanvas');
+    const ctx    = canvas.getContext('2d');  // 2D modda aç
+
+    // Canvas boyutunu ayarla — ekranın tamamına yakın
+    // 900x600 sabit boyut kullanıyoruz (daha sonra responsive yapılabilir)
+    canvas.width  = 900;
+    canvas.height = 600;
+
+
+    // ============================================
+    // 2. OYUN DURUMU DEĞİŞKENLERİ
+    // Oyunun o anki hâlini tutan değişkenler
+    // ============================================
+    let oyunDurumu = 'BEKLIYOR';   // 'BEKLIYOR' | 'OYNUYOR' | 'DURAKLATILDI' | 'BITTI'
+    let mevcutSeviye = 0;           // Hangi seviyede olduğumuz (dizi indeksi)
+    let kalanHamle  = 3;            // Her seviyede kaç atış hakkı var
+
+
+    // ============================================
+    // 3. TOP OBJESİ
+    // Oyuncunun kontrol ettiği top
+    // TODO: görseli daha sonra sprite/resim ile değiştirebilirsin
+    // ============================================
+    const top = {
+      x: 200,          // Yatay konum (piksel)
+      y: 300,          // Dikey konum (piksel)
+      r: 14,           // Yarıçap (piksel)
+      vx: 0,           // Yatay hız (piksel/frame)
+      vy: 0,           // Dikey hız (piksel/frame)
+      hareketEdiyor: false,  // Top şu an hareket ediyor mu?
+      renk: '#a090ff'        // Top rengi
+
+      // TODO: top görselini resim olarak eklemek istersen:
+      // gorsel: new Image() → gorsel.src = 'img/top.png'
+    };
+
+
+    // ============================================
+    // 4. FİZİK SABİTLERİ
+    // Bunları değiştirerek oyunun hissini ayarlarsın
+    // ============================================
+    const FIZIK = {
+      yerekimi:   0.25,   // Her frame vy'ye eklenir — büyütürsen daha hızlı düşer
+      surtunem:   0.99,   // Her frame hız bu sayıyla çarpılır — küçültürsen daha çabuk durur
+      duvarYitim: 0.70,   // Duvara çarptığında hız kaybı — 1.0 = enerji kaybı yok
+      maxHiz:     18      // Topun ulaşabileceği maksimum hız
+    };
+
+
+    // ============================================
+    // 5. KAPI (GATE) SINIFI
+    // Her kapı: merkez nokta, uzunluk, dönme açısı ve hızından oluşur
+    //
+    // Algoritma:
+    //   Kapı = bir çizgi parçası (line segment)
+    //   İki uç nokta = merkez ± (cos/sin * uzunluk/2)
+    //   Her frame: açı += donmeHizi
+    //   Top kapıya değdiğinde: hız vektörü yansıtılır
+    // ============================================
+    class Kapi {
+      constructor(cx, cy, uzunluk, baslangicAcisi, donmeHizi, renk = '#60d0ff') {
+        this.cx          = cx;           // Merkez X
+        this.cy          = cy;           // Merkez Y
+        this.uzunluk     = uzunluk;      // Kapı uzunluğu (piksel)
+        this.aci         = baslangicAcisi; // Başlangıç açısı (radyan)
+        this.donmeHizi   = donmeHizi;    // Açı artış hızı (radyan/frame), negatif = ters yön
+        this.renk        = renk;
+        this.parcaciklar = [];           // TODO: geçiş anında parcacık efekti eklenecek
+      }
+
+      // Her frame çağrılır — açıyı günceller
+      guncelle() {
+        this.aci += this.donmeHizi;
+        // TODO: bazı kapılar ileri-geri sallanabilir (sinüs hareketi)
+        // this.aci = this.baslangicAcisi + Math.sin(Date.now() * 0.002) * Math.PI / 4;
+      }
+
+      // Kapının iki uç noktasını döndürür
+      ucNoktalar() {
+        const yariUzunluk = this.uzunluk / 2;
+        return {
+          ax: this.cx + Math.cos(this.aci) * yariUzunluk,
+          ay: this.cy + Math.sin(this.aci) * yariUzunluk,
+          bx: this.cx - Math.cos(this.aci) * yariUzunluk,
+          by: this.cy - Math.sin(this.aci) * yariUzunluk
+        };
+      }
+
+      // Canvas'a kapıyı çizer
+      ciz() {
+        const { ax, ay, bx, by } = this.ucNoktalar();
+
+        // Kapı gövdesi
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
+        ctx.strokeStyle = this.renk;
+        ctx.lineWidth   = 4;
+        ctx.lineCap     = 'round';
+
+        // TODO: daha güzel görsel için gradient eklenebilir
+        // const grad = ctx.createLinearGradient(ax, ay, bx, by);
+        // grad.addColorStop(0, '#ff60a0'); grad.addColorStop(1, '#60d0ff');
+        // ctx.strokeStyle = grad;
+
+        ctx.stroke();
+
+        // Kapı merkez noktası (küçük ışıltı efekti)
+        ctx.beginPath();
+        ctx.arc(this.cx, this.cy, 4, 0, Math.PI * 2);
+        ctx.fillStyle = this.renk;
+        ctx.fill();
+      }
+    }
+
+
+    // ============================================
+    // 6. HEDEF OBJESİ
+    // Topun ulaşması gereken daire
+    // ============================================
+    const hedef = {
+      x: 700,
+      y: 300,
+      r: 22,           // Yarıçap — büyütürsen kolay, küçültürsen zor
+      renk: '#60ff90', // Yeşil
+
+      ciz() {
+        // Dış halka (ışıltı efekti için)
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r + 6, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(96, 255, 144, 0.25)';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        // İç daire
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(96, 255, 144, 0.15)';
+        ctx.fill();
+        ctx.strokeStyle = this.renk;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // TODO: hedef etrafında dönen animasyon eklenebilir
+      }
+    };
+
+
+    // ============================================
+    // 7. SEVİYELER
+    // Her seviye: kapı listesi, topun başlangıç konumu, hedef konumu
+    //
+    // TODO: daha fazla seviye ekle — en az 3 olsun
+    // TODO: engel duvarları eklenebilir (statik çizgiler)
+    // ============================================
+    const seviyeler = [
+
+      // --- SEVİYE 1 (Kolay) ---
+      {
+        topBaslangic: { x: 150, y: 300 },
+        hedefKonum:   { x: 750, y: 300 },
+        kapilar: [
+          new Kapi(450, 300, 120, 0, 0.012, '#60d0ff')
+          // TODO: ikinci bir kapı ekle
+        ]
+        // TODO: engeller: [ {x1,y1,x2,y2} ]
+      },
+
+      // --- SEVİYE 2 (Orta) ---
+      {
+        topBaslangic: { x: 150, y: 200 },
+        hedefKonum:   { x: 750, y: 400 },
+        kapilar: [
+          new Kapi(350, 250, 100, Math.PI / 4,  0.015, '#ff60a0'),
+          new Kapi(550, 380, 100, Math.PI / 2, -0.010, '#60d0ff')
+        ]
+      },
+
+      // --- SEVİYE 3 (Zor) ---
+      {
+        topBaslangic: { x: 150, y: 450 },
+        hedefKonum:   { x: 750, y: 150 },
+        kapilar: [
+          new Kapi(300, 300, 90,  0,              0.020, '#ff9060'),
+          new Kapi(500, 200, 110, Math.PI / 3,   -0.018, '#60d0ff'),
+          new Kapi(650, 400, 80,  Math.PI * 0.7,  0.025, '#ff60a0')
+        ]
+        // TODO: bu seviyeye engel duvarları ekle
+      }
+
+    ];
+
+
+    // ============================================
+    // 8. SEVİYEYİ YÜKLE
+    // Seçilen seviyenin verilerini oyuna uygular
+    // ============================================
+    function seviyeyiYukle(indeks) {
+      const sv = seviyeler[indeks];
+
+      // Topu başlangıç konumuna koy, hareketi sıfırla
+      top.x = sv.topBaslangic.x;
+      top.y = sv.topBaslangic.y;
+      top.vx = 0;
+      top.vy = 0;
+      top.hareketEdiyor = false;
+
+      // Hedefi konumlandır
+      hedef.x = sv.hedefKonum.x;
+      hedef.y = sv.hedefKonum.y;
+
+      // Hamle hakkını sıfırla
+      kalanHamle = 3;
+      hudGuncelle();
+    }
+
+
+    // ============================================
+    // 9. HUD GÜNCELLEME
+    // Ekrandaki seviye ve hamle bilgisini günceller
+    // ============================================
+    function hudGuncelle() {
+      document.getElementById('seviyeNo').textContent = mevcutSeviye + 1;
+      document.getElementById('hamleNo').textContent  = kalanHamle;
+    }
+
+
+    // ============================================
+    // 10. FARE GİRDİSİ
+    // Kullanıcı fareyi basılı tutup çekip bırakarak top fırlatır
+    // Algoritma: bırakma noktası - başlangıç noktası = hız vektörü
+    // ============================================
+    let fareBasili = false;
+    let fareBaslangic = { x: 0, y: 0 };
+    let fareSon      = { x: 0, y: 0 };
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (oyunDurumu !== 'OYNUYOR') return;
+      if (top.hareketEdiyor) return;  // Top zaten uçuyorsa yeni atış yapma
+
+      fareBasili = true;
+      fareBaslangic = { x: e.offsetX, y: e.offsetY };
+      fareSon       = { x: e.offsetX, y: e.offsetY };
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!fareBasili) return;
+      fareSon = { x: e.offsetX, y: e.offsetY };  // Nişan çizgisi için son konumu güncelle
+    });
+
+    canvas.addEventListener('mouseup', (e) => {
+      if (!fareBasili) return;
+      fareBasili = false;
+
+      // Fırlatma vektörü: başlangıçtan sona doğru
+      // Böldük çünkü çok güçlü atış olmasın — katsayıyı ayarlayabilirsin
+      const gucKatsayi = 0.13;
+      top.vx = (e.offsetX - fareBaslangic.x) * gucKatsayi;
+      top.vy = (e.offsetY - fareBaslangic.y) * gucKatsayi;
+
+      // Maksimum hız sınırını uygula
+      const hizBuyuklugu = Math.hypot(top.vx, top.vy);
+      if (hizBuyuklugu > FIZIK.maxHiz) {
+        top.vx = (top.vx / hizBuyuklugu) * FIZIK.maxHiz;
+        top.vy = (top.vy / hizBuyuklugu) * FIZIK.maxHiz;
+      }
+
+      top.hareketEdiyor = true;
+
+      // Hamle hakkını azalt
+      kalanHamle--;
+      hudGuncelle();
+
+      // TODO: fırlatma sesi çal
+      // document.getElementById('gecisEfekt').play();
+    });
+
+
+    // ============================================
+    // 11. KLAVYE GİRDİSİ
+    // R → Seviyeyi yeniden başlat
+    // ESC → Oyunu duraklat / devam et
+    // ============================================
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'r' || e.key === 'R') {
+        if (oyunDurumu === 'OYNUYOR') seviyeyiYukle(mevcutSeviye);
+      }
+
+      if (e.key === 'Escape') {
+        if (oyunDurumu === 'OYNUYOR') {
+          oyunDurumu = 'DURAKLATILDI';
+          document.getElementById('duraklatilaEkrani').classList.remove('gizli');
+        } else if (oyunDurumu === 'DURAKLATILDI') {
+          oyunDurumu = 'OYNUYOR';
+          document.getElementById('duraklatilaEkrani').classList.add('gizli');
+        }
+      }
+    });
+
+
+    // ============================================
+    // 12. ÇARPIŞMA TESPİTİ — Circle & Segment
+    // Top (daire) ile kapı (çizgi parçası) çakışıyor mu?
+    //
+    // Algoritma:
+    //   1. Çizgi üzerindeki en yakın noktayı bul (parametre t)
+    //   2. t'yi 0-1 arasına kısıt (segment dışına taşma)
+    //   3. Mesafe < yarıçap ise çarpışma var
+    // ============================================
+    function carpismaVarMi(daire, seg) {
+      const dx = seg.bx - seg.ax;
+      const dy = seg.by - seg.ay;
+      const uzunlukKare = dx * dx + dy * dy;
+
+      // Boş segment kontrolü
+      if (uzunlukKare === 0) return false;
+
+      // t: noktanın segment üzerindeki projeksiyon parametresi
+      const t = Math.max(0, Math.min(1,
+        ((daire.x - seg.ax) * dx + (daire.y - seg.ay) * dy) / uzunlukKare
+      ));
+
+      // Segmentteki en yakın nokta
+      const enYakinX = seg.ax + t * dx;
+      const enYakinY = seg.ay + t * dy;
+
+      // Mesafe hesapla
+      const mesafe = Math.hypot(daire.x - enYakinX, daire.y - enYakinY);
+
+      return mesafe < daire.r;
+    }
+
+
+    // ============================================
+    // 13. KAPI GEÇİŞ EFEKTİ — Hız Vektörü Yansıtma
+    // Top kapıya değdiğinde hızı kapıya göre yansıtılır
+    //
+    // Algoritma (Yansıma Formülü):
+    //   n = kapının normal vektörü (kapıya dik)
+    //   v' = v - 2 * (v · n) * n
+    //   · = nokta çarpım (dot product)
+    // ============================================
+    function hiziYansit(kapi) {
+      // Kapının normal vektörü (kapıya dik olan yön)
+      const nx = Math.cos(kapi.aci + Math.PI / 2);
+      const ny = Math.sin(kapi.aci + Math.PI / 2);
+
+      // Nokta çarpım: topun hızının normal yöndeki bileşeni
+      const nokta = top.vx * nx + top.vy * ny;
+
+      // Yansıtılmış hız
+      top.vx = top.vx - 2 * nokta * nx;
+      top.vy = top.vy - 2 * nokta * ny;
+
+      // TODO: geçiş anında parcacık efekti (canvas arc küçük daireler)
+      // TODO: geçiş sesi çal
+      // document.getElementById('gecisEfekt').currentTime = 0;
+      // document.getElementById('gecisEfekt').play();
+    }
+
+
+    // ============================================
+    // 14. FİZİK GÜNCELLEMESİ
+    // Her frame çağrılır — topu hareket ettirir
+    // ============================================
+    function topuGuncelle() {
+      if (!top.hareketEdiyor) return;
+
+      // Yerçekimi uygula
+      top.vy += FIZIK.yerekimi;
+
+      // Sürtünme uygula
+      top.vx *= FIZIK.surtunem;
+      top.vy *= FIZIK.surtunem;
+
+      // Konumu güncelle
+      top.x += top.vx;
+      top.y += top.vy;
+
+      // --- DUVAR ÇARPIŞMALARI ---
+
+      // Sol duvar
+      if (top.x - top.r < 0) {
+        top.x  = top.r;
+        top.vx = Math.abs(top.vx) * FIZIK.duvarYitim;
+      }
+      // Sağ duvar
+      if (top.x + top.r > canvas.width) {
+        top.x  = canvas.width - top.r;
+        top.vx = -Math.abs(top.vx) * FIZIK.duvarYitim;
+      }
+      // Üst duvar
+      if (top.y - top.r < 0) {
+        top.y  = top.r;
+        top.vy = Math.abs(top.vy) * FIZIK.duvarYitim;
+      }
+      // Alt duvar (zemin)
+      if (top.y + top.r > canvas.height) {
+        top.y  = canvas.height - top.r;
+        top.vy = -Math.abs(top.vy) * FIZIK.duvarYitim;
+
+        // Top neredeyse durmuşsa hareketi bitir
+        if (Math.abs(top.vy) < 0.8) {
+          top.vy = 0;
+          top.hareketEdiyor = false;
+
+          // Hamle kalmadıysa seviyeyi yeniden başlat
+          if (kalanHamle <= 0) {
+            // TODO: oyun bitti ekranı göster
+            setTimeout(() => seviyeyiYukle(mevcutSeviye), 800);
+          }
+        }
+      }
+
+      // --- KAPI ÇARPIŞMALARI ---
+      const sv = seviyeler[mevcutSeviye];
+      for (const kapi of sv.kapilar) {
+        const { ax, ay, bx, by } = kapi.ucNoktalar();
+
+        if (carpismaVarMi(top, { ax, ay, bx, by })) {
+          hiziYansit(kapi);
+
+          // Topun kapının içine gömülmesini engelle (hafif itme)
+          top.x += top.vx * 2;
+          top.y += top.vy * 2;
+        }
+      }
+
+      // --- HEDEF ÇARPIŞMASI ---
+      const hedefMesafe = Math.hypot(top.x - hedef.x, top.y - hedef.y);
+      if (hedefMesafe < top.r + hedef.r) {
+        // Hedefe ulaşıldı!
+        seviyeBitti();
+      }
+    }
+
+
+    // ============================================
+    // 15. SEVİYE BİTTİ
+    // ============================================
+    function seviyeBitti() {
+      top.hareketEdiyor = false;
+      top.vx = 0;
+      top.vy = 0;
+
+      // TODO: hedef ses efekti çal
+      // document.getElementById('hedefEfekt').play();
+
+      // Sonraki seviye var mı?
+      if (mevcutSeviye + 1 < seviyeler.length) {
+        mevcutSeviye++;
+        setTimeout(() => seviyeyiYukle(mevcutSeviye), 1000);
+      } else {
+        // Tüm seviyeler bitti
+        oyunDurumu = 'BITTI';
+        document.getElementById('bitisBaslik').textContent  = '🎉 KAZANDIN!';
+        document.getElementById('bitisMesaj').textContent   = 'Tüm seviyeleri tamamladın!';
+        document.getElementById('oyunBittiEkrani').classList.remove('gizli');
+      }
+    }
+
+
+    // ============================================
+    // 16. NİŞAN ÇİZGİSİ
+    // Fare basılıyken toptan imleçe doğru kesikli çizgi
+    // ============================================
+    function nisanCiz() {
+      if (!fareBasili || top.hareketEdiyor) return;
+
+      ctx.beginPath();
+      ctx.moveTo(top.x, top.y);
+      ctx.lineTo(fareSon.x, fareSon.y);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth   = 2;
+      ctx.setLineDash([6, 6]);   // Kesikli çizgi
+      ctx.stroke();
+      ctx.setLineDash([]);        // Çizgiyi sıfırla (diğer çizimler etkilenmesin)
+
+      // TODO: kesikli çizgi boyunca küçük ok işaretleri eklenebilir
+    }
+
+
+    // ============================================
+    // 17. TOPU ÇİZ
+    // ============================================
+    function topuCiz() {
+      // Gölge efekti
+      ctx.shadowColor = top.renk;
+      ctx.shadowBlur  = 15;
+
+      ctx.beginPath();
+      ctx.arc(top.x, top.y, top.r, 0, Math.PI * 2);
+      ctx.fillStyle = top.renk;
+      ctx.fill();
+
+      // Parlak iç nokta (3D hissi)
+      ctx.beginPath();
+      ctx.arc(top.x - top.r * 0.3, top.y - top.r * 0.3, top.r * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.fill();
+
+      ctx.shadowBlur = 0;  // Gölgeyi sıfırla
+
+      // TODO: top sprite (resmi) ile değiştirmek için:
+      // ctx.drawImage(topGorseli, top.x - top.r, top.y - top.r, top.r*2, top.r*2);
+    }
+
+
+    // ============================================
+    // 18. ARKAPLAN ÇİZ
+    // Izgara deseni + köşe süslemeleri
+    // ============================================
+    function arkaplanCiz() {
+      // Siyah zemin
+      ctx.fillStyle = '#0d0d1a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // İnce ızgara çizgileri
+      ctx.strokeStyle = 'rgba(40, 40, 80, 0.5)';
+      ctx.lineWidth   = 1;
+      const aralik = 50;
+
+      for (let x = 0; x <= canvas.width; x += aralik) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= canvas.height; y += aralik) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      // TODO: daha zengin arka plan için yıldız/parçacık sistemi eklenebilir
+      // TODO: seviyeye göre renk teması değiştirebilirsin
+    }
+
+
+    // ============================================
+    // 19. ANA ÇİZİM FONKSİYONU
+    // Her frame tüm sahneyi baştan çizer (dirty rect yok)
+    // ============================================
+    function ciz() {
+      arkaplanCiz();
+
+      if (oyunDurumu !== 'OYNUYOR' && oyunDurumu !== 'DURAKLATILDI') return;
+
+      // Mevcut seviyenin kapılarını çiz
+      const sv = seviyeler[mevcutSeviye];
+      for (const kapi of sv.kapilar) {
+        kapi.ciz();
+      }
+
+      hedef.ciz();     // Hedefi çiz
+      topuCiz();       // Topu çiz
+      nisanCiz();      // Nişan çizgisini çiz (fare basılıysa)
+
+      // TODO: skor animasyonu (hedefe ulaşınca "+1" yazısı uçsun)
+      // TODO: kapı geçiş efekti (ışıltı, parcacık)
+    }
+
+
+    // ============================================
+    // 20. ANA OYUN DÖNGÜSÜ
+    // requestAnimationFrame = tarayıcının ekran yenileme hızına (60fps) göre çalışır
+    // Algoritma: güncelle → çiz → tekrar et
+    // ============================================
+    function oyunDongusu() {
+      if (oyunDurumu === 'OYNUYOR') {
+        // Kapıları döndür
+        const sv = seviyeler[mevcutSeviye];
+        for (const kapi of sv.kapilar) {
+          kapi.guncelle();
+        }
+
+        // Topu güncelle (fizik + çarpışma)
+        topuGuncelle();
+      }
+
+      // Sahneyi çiz (duraklatılmışsa bile arka plan çizilir)
+      ciz();
+
+      // Bir sonraki frame için kendini tekrar çağır
+      requestAnimationFrame(oyunDongusu);
+    }
+
+
+    // ============================================
+    // 21. BUTON OLAYLARI
+    // Ekran butonlarının tıklama olayları
+    // ============================================
+
+    // Başlat butonu
+    document.getElementById('baslatButon').addEventListener('click', () => {
+      document.getElementById('baslangicEkrani').classList.add('gizli');
+      document.getElementById('hud').classList.remove('gizli');
+
+      mevcutSeviye = 0;
+      oyunDurumu   = 'OYNUYOR';
+      seviyeyiYukle(0);
+
+      // TODO: arkaplan müziğini başlat
+      // const muzik = document.getElementById('muzik');
+      // muzik.volume = 0.4;
+      // muzik.play().catch(() => {}); // Tarayıcı otomatik ses engelini aşmak için catch
+    });
+
+    // Devam et butonu
+    document.getElementById('devamButon').addEventListener('click', () => {
+      oyunDurumu = 'OYNUYOR';
+      document.getElementById('duraklatilaEkrani').classList.add('gizli');
+    });
+
+    // Tekrar oyna butonu
+    document.getElementById('tekrarButon').addEventListener('click', () => {
+      document.getElementById('oyunBittiEkrani').classList.add('gizli');
+      mevcutSeviye = 0;
+      oyunDurumu   = 'OYNUYOR';
+      seviyeyiYukle(0);
+    });
+
+
+    // ============================================
+    // 22. OYUNU BAŞLAT
+    // Döngüyü ilk kez çalıştır
+    // ============================================
+    oyunDongusu();
+
+  </script>
+</body>
+</html>
