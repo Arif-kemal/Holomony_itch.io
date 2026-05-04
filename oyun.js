@@ -126,4 +126,5 @@ oyunDongusu();
 
 
 
+    //hocam iyi hoşta htmli çalışıtırnca başlat menüsünde kalıyıyoryuz nasıl düzeltiriz
     

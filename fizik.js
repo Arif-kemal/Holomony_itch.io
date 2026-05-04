@@ -20,3 +20,4 @@ const kupYuzleri = [
 const kup = {
     mevcutYuz: 0
 };
+
