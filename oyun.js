@@ -30,11 +30,11 @@ let kalanHamle = 3;      // Her seviyede kaç atış hakkımız var
 
 // ------------------------------------------
 // 3. TOP OBJESİ
-// Oyuncunun fırlattığı top.
+// Oyuncunun fırlattığı topu.
 // hizX ve hizY her frame konuma eklenir — böylece hareket olur.
 // fizik.js'deki topuHarekettir() bu objeyi kullanır.
 // ------------------------------------------
-let top = {
+let topu = {
     x: 150, y: 300,  // Ekrandaki konum (piksel)
     r: 14,            // Yarıçap — çarpışma hesaplarında kullanılır
     hizX: 0,          // Yatay hız — pozitif = sağa, negatif = sola
@@ -187,11 +187,11 @@ function seviyeyiHazirla(indeks) {
     let bolum = seviyeler[indeks];
 
     // Topu başlangıç konumuna taşı ve durdur
-    top.x = bolum.topX;
-    top.y = bolum.topY;
-    top.hizX = 0;
-    top.hizY = 0;
-    top.hareketEdiyor = false;
+    topu.x = bolum.topX;
+    topu.y = bolum.topY;
+    topu.hizX = 0;
+    topu.hizY = 0;
+    topu.hareketEdiyor = false;
 
     // Hedefi doğru yere koy
     hedef.x = bolum.hedefX;
@@ -221,7 +221,7 @@ let cekisSon = { x: 0, y: 0 };
 // Fare tıklandığında — nişan almaya başla
 canvas.addEventListener('mousedown', function(e) {
     // Oyun oynamıyorsa veya top zaten uçuyorsa atış yapma
-    if (oyunDurumu !== 'OYNANIYOR' || top.hareketEdiyor) return;
+    if (oyunDurumu !== 'OYNANIYOR' || topu.hareketEdiyor) return;
 
     fareBasili = true;
     cekisBaslangic = { x: e.offsetX, y: e.offsetY };
@@ -242,19 +242,19 @@ canvas.addEventListener('mouseup', function(e) {
     // Hız = (bırakma - basma) * güç katsayısı
     // 0.12 katsayısı çok hızlı gitmemesi için ayarlandı
     let gucKatsayi = 0.12;
-    top.hizX = (e.offsetX - cekisBaslangic.x) * gucKatsayi;
-    top.hizY = (e.offsetY - cekisBaslangic.y) * gucKatsayi;
+    topu.hizX = (e.offsetX - cekisBaslangic.x) * gucKatsayi;
+    topu.hizY = (e.offsetY - cekisBaslangic.y) * gucKatsayi;
 
     // Maksimum hız sınırı — Math.hypot iki kenardan hipotenüsü bulur
     // yani hız vektörünün büyüklüğünü hesaplar
-    let toplamHiz = Math.hypot(top.hizX, top.hizY);
+    let toplamHiz = Math.hypot(topu.hizX, topu.hizY);
     if (toplamHiz > 18) {
         // Oranı koruyarak 18'e düşür
-        top.hizX = (top.hizX / toplamHiz) * 18;
-        top.hizY = (top.hizY / toplamHiz) * 18;
+        topu.hizX = (topu.hizX / toplamHiz) * 18;
+        topu.hizY = (topu.hizY / toplamHiz) * 18;
     }
 
-    top.hareketEdiyor = true;
+    topu.hareketEdiyor = true;
     kalanHamle--;
     hudGuncelle();
 });
@@ -375,14 +375,14 @@ function topuCiz() {
     cizim.shadowBlur = 18;
 
     cizim.beginPath();
-    cizim.arc(top.x, top.y, top.r, 0, Math.PI * 2);
+    cizim.arc(topu.x, topu.y, topu.r, 0, Math.PI * 2);
     cizim.fillStyle = topRenk;
     cizim.fill();
 
     // Parlak iç nokta — topun küresel göründüğü his verir
     cizim.shadowBlur = 0; // İç nokta için ışımayı kapat
     cizim.beginPath();
-    cizim.arc(top.x - top.r * 0.3, top.y - top.r * 0.3, top.r * 0.35, 0, Math.PI * 2);
+    cizim.arc(topu.x - topu.r * 0.3, topu.y - topu.r * 0.3, topu.r * 0.35, 0, Math.PI * 2);
     cizim.fillStyle = 'rgba(255, 255, 255, 0.5)';
     cizim.fill();
 
@@ -391,10 +391,10 @@ function topuCiz() {
 
 // Nişan çizgisi — fare basılıyken toptan imleç yönüne kesik çizgi
 function nisanCiz() {
-    if (!fareBasili || top.hareketEdiyor) return;
+    if (!fareBasili || topu.hareketEdiyor) return;
 
     cizim.beginPath();
-    cizim.moveTo(top.x, top.y);
+    cizim.moveTo(topu.x, topu.y);
     cizim.lineTo(cekisSon.x, cekisSon.y);
     cizim.strokeStyle = 'rgba(255, 255, 255, 0.35)';
     cizim.lineWidth = 2;
@@ -532,16 +532,16 @@ function anaDongu() {
                 hiziYansit(top, kapi.aci);
 
                 // Topun kapının içine gömülmesini engelle
-                top.x += top.hizX * 2;
-                top.y += top.hizY * 2;
+                topu.x += topu.hizX * 2;
+                topu.y += topu.hizY * 2;
             }
         }
 
         // Hedefe ulaşıldı mı?
         // Math.hypot = iki nokta arasındaki mesafe (Pisagor teoremi)
-        let mesafe = Math.hypot(top.x - hedef.x, top.y - hedef.y);
-        if (mesafe < top.r + hedef.r) {
-            top.hareketEdiyor = false;
+        let mesafe = Math.hypot(topu.x - hedef.x, topu.y - hedef.y);
+        if (mesafe < topu.r + hedef.r) {
+            topu.hareketEdiyor = false;
 
             // Başka seviye var mı?
             if (kacinciSeviye + 1 < seviyeler.length) {
@@ -558,7 +558,7 @@ function anaDongu() {
         }
 
         // Top durdu ve hamle kalmadıysa seviyeyi sıfırla
-        if (!top.hareketEdiyor && kalanHamle <= 0) {
+        if (!topu.hareketEdiyor && kalanHamle <= 0) {
             setTimeout(function() {
                 seviyeyiHazirla(kacinciSeviye);
             }, 800);
