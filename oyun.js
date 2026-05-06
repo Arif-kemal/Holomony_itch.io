@@ -1,610 +1,730 @@
-// ==========================================
-// oyun.js — Ana Oyun Motoru
-// Bu dosya fizik.js'deki fonksiyonları kullanır.
-// Çizim, kontrol, seviye yönetimi hep burada.
-// ==========================================
+// ============================================================
+//  oyun.js — Holonomy Küp Yüzey Bulmacası
+//  Ana oyun döngüsü: fizik, top, render, oda geçişleri
+//  Bağımlılık: harita.js önce yüklenmiş olmalı
+// ============================================================
 
+// ─── Canvas ve 2D bağlam ───
+const kanvas  = document.getElementById("oyunCanvas");
+const ctx     = kanvas.getContext("2d");
 
-// ------------------------------------------
-// 1. CANVAS KURULUMU
-// HTML'deki <canvas> elementini JavaScript'e bağlıyoruz.
-// 'cizim' değişkeni tüm çizim komutlarının çalıştığı kalem gibidir.
-// ------------------------------------------
-const canvas = document.getElementById('oyunCanvas');
-const cizim = canvas.getContext('2d'); // 2D modda aç
+// ============================================================
+//  SABITLER
+// ============================================================
+const HUCRE_BOY       = 40;      // her grid hücresinin piksel boyutu
+const YERÇEKIMI       = 0.55;    // kare başına hız artışı (piksel/kare²)
+const MAX_DÜŞÜŞ_HIZI  = 14;      // aşağı düşüş hız sınırı
+const HAREKET_HIZI    = 3.8;     // yatay hareket hızı (piksel/kare)
+const ZIPLAMA_GUCU    = -11.5;   // negatif = yukarı (piksel/kare)
+const SÜRTÜNME        = 0.82;    // yerde durduğunda yatay hız katsayısı
+const HAVA_SÜRTÜNMESI = 0.92;    // havadayken yatay hız katsayısı
 
-canvas.width = 900;
-canvas.height = 600;
+// Topun normal yarıçapı (piksel)
+const TOP_YARIÇAP     = 14;
 
+// Squish (ezilme) animasyon katsayıları
+const SQUISH_ÇARPAN   = 0.45;    // ne kadar ezilir (0=hiç, 1=tam)
+const SQUISH_GERİ     = 0.18;    // geri yaylanma hızı
 
-// ------------------------------------------
-// 2. OYUN DURUMU DEĞİŞKENLERİ
-// Oyunun hangi ekranda olduğunu takip eder.
-// Bu değişkene göre hangi şeylerin çizileceğine
-// ve hangi kontrollerin çalışacağına karar veririz.
-// ------------------------------------------
-let oyunDurumu = 'MENU'; // 'MENU' | 'OYNANIYOR' | 'DURDURULDU' | 'BITTI'
-let kacinciSeviye = 0;   // Hangi seviyedeyiz (dizi indeksi, 0'dan başlar)
-let kalanHamle = 3;      // Her seviyede kaç atış hakkımız var
-
-
-// ------------------------------------------
-// 3. TOP OBJESİ
-// Oyuncunun fırlattığı topu.
-// hizX ve hizY her frame konuma eklenir — böylece hareket olur.
-// fizik.js'deki topuHarekettir() bu objeyi kullanır.
-// ------------------------------------------
-let topu = {
-    x: 150, y: 300,  // Ekrandaki konum (piksel)
-    r: 14,            // Yarıçap — çarpışma hesaplarında kullanılır
-    hizX: 0,          // Yatay hız — pozitif = sağa, negatif = sola
-    hizY: 0,          // Dikey hız — pozitif = aşağı, negatif = yukarı
-    hareketEdiyor: false  // Fırlatıldı mı? Duruyorsa false.
+// Renk paleti (CSS değişkenleriyle uyumlu)
+const RENKLER = {
+  arkaplan:   "#0a0a14",
+  duvar:      "#3a3a6a",
+  duvarKenar: "#5a5a9a",
+  portal:     "#ff4466",
+  portalPark: "rgba(255,68,102,0.18)",
+  top:        "#f5e642",
+  topParıltı: "#fff9a0",
+  topGölge:   "#c4a800",
+  grid:       "rgba(255,255,255,0.03)",
+  geçiş:      "rgba(120,100,255,0.12)",
 };
 
+// ============================================================
+//  OYUN DURUMU
+// ============================================================
 
-// ------------------------------------------
-// 4. HEDEF OBJESİ
-// Topun ulaşması gereken yeşil daire.
-// ------------------------------------------
-let hedef = {
-    x: 750, y: 300,
-    r: 22
+// Mevcut oda ve harita dönüşü
+let mevcutOda    = 1;     // 1-6 arası aktif oda
+let haritaDönüş  = 0;     // mevcut haritanın ekstra dönüş açısı (0/90/180/270)
+                           // (sağ-sol geçişlerde 0 kalır, portalda değişir)
+
+// Döndürülmüş matris — her oda geçişinde hesaplanır
+let aktifMatris  = matrisDondur(odaMatrisiAl(mevcutOda), haritaDönüş);
+
+// Aktif matrisin satır/sütun sayısı (dönüşten sonra değişebilir)
+let matrisSatir  = aktifMatris.length;
+let matrisSutun  = aktifMatris[0].length;
+
+// ─── Top nesnesi ───
+const topumuz = {
+  x:          0,           // piksel pozisyonu (merkez)
+  y:          0,
+  hizX:       0,           // yatay hız
+  hizY:       0,           // dikey hız (+ = aşağı)
+  yariçap:    TOP_YARIÇAP,
+  yerde:      false,       // zeminde mi?
+  squishY:    1.0,         // dikey ölçek (1=normal, <1=ezilmiş)
+  squishX:    1.0,         // yatay ölçek
+  atlama:     0,           // toplam atlama sayacı (HUD için)
 };
 
+// ─── Klavye durumu ───
+const tuşlar = {
+  sol:   false,
+  sağ:   false,
+  zıpla: false,
+};
 
-// ------------------------------------------
-// 5. DÖNEN KAPI SINIFI
-// Her kapı bir çizgi parçasıdır — merkez nokta, uzunluk ve açıyla tanımlanır.
-// Her frame guncelle() çağrılınca aci değişir, kapı döner.
-// uclariGetir() fonksiyonu fizik.js'deki carpismavar() için gereklidir.
-// ------------------------------------------
-class DonenKapi {
-    constructor(x, y, uzunluk, baslangicAcisi, donusHizi, renk) {
-        this.x = x;                      // Merkez nokta X
-        this.y = y;                      // Merkez nokta Y
-        this.uzunluk = uzunluk;          // Kapının piksel uzunluğu
-        this.aci = baslangicAcisi;       // Başlangıç açısı (radyan cinsinden)
-        this.donusHizi = donusHizi;      // Her frame kaç radyan dönecek
-        this.renk = renk;                // Çizim rengi
-    }
+// Zıplama önce bir kez tetiklenmeli, sürekli basılı kalınca tekrar zıplamasın
+let zıplamaBasıldı = false;
 
-    // Her frame çağrılır — açıyı artırarak kapıyı döndürür
-    guncelle() {
-        this.aci += this.donusHizi;
-        // Not: Math.PI * 2 = 360 derece, yani tam tur
-        // donusHizi = 0.02 ise saniyede yaklaşık 72 derece döner (60fps'de)
-    }
+// ─── Ses nesneleri ───
+const sesMüzik  = document.getElementById("ses-muzik");
+const sesGeçiş  = document.getElementById("ses-gecis");
+const sesHedef  = document.getElementById("ses-hedef");
 
-    // Kapının iki uç noktasını hesaplar
-    // Bu noktalar fizik.js'deki carpismavar() fonksiyonuna gönderilir
-    uclariGetir() {
-        let yari = this.uzunluk / 2;
-        return {
-            basX: this.x + Math.cos(this.aci) * yari,
-            basY: this.y + Math.sin(this.aci) * yari,
-            sonX: this.x - Math.cos(this.aci) * yari,
-            sonY: this.y - Math.sin(this.aci) * yari
-        };
-    }
+// ─── Oyun aktif mi? ───
+let oyunAktif = false;
 
-    // Kapıyı canvas'a çizer
-    ciz() {
-        let uclar = this.uclariGetir();
+// ─── Geçiş animasyonu durumu ───
+const geçişAnim = {
+  aktif:    false,
+  süre:     18,      // kare sayısı
+  sayaç:    0,
+  yön:      "sağ",   // "sağ" | "sol" | "portal"
+};
 
-        // Kapı gövdesi — iki uç nokta arasına çizgi çek
-        cizim.beginPath();
-        cizim.moveTo(uclar.basX, uclar.basY);
-        cizim.lineTo(uclar.sonX, uclar.sonY);
-        cizim.strokeStyle = this.renk;
-        cizim.lineWidth = 4;
-        cizim.lineCap = 'round'; // Uçlar yuvarlak görünsün
-        cizim.stroke();
+// ─── requestAnimationFrame handle'ı ───
+let animasyonId = null;
 
-        // Merkezdeki döndürme noktasını küçük daire ile göster
-        cizim.beginPath();
-        cizim.arc(this.x, this.y, 5, 0, Math.PI * 2);
-        cizim.fillStyle = '#ffffff';
-        cizim.fill();
-    }
-}
+// ============================================================
+//  BAŞLANGIÇ — DOM hazır olduğunda çalışır
+// ============================================================
+window.addEventListener("load", () => {
+  // Canvas boyutunu ilk aktif matrise göre ayarla
+  kanvasYenidenBoyutla();
 
+  // Topu başlangıç pozisyonuna yerleştir
+  topuSıfırla();
 
-// ------------------------------------------
-// 6. SEVİYELER
-// Her seviye: topun başlangıç yeri, hedefin yeri ve kapıların listesi.
-// Kapılar DonenKapi sınıfından oluşturulur.
-// Yeni seviye eklemek için bu diziye yeni bir obje ekle.
-// ------------------------------------------
-const seviyeler = [
+  // İlk kareyi çiz (dondurulmuş ekran)
+  çiz();
 
-    // SEVİYE 1 — Tek kapı, geniş alan, alışmak için
-    {
-        topX: 150, topY: 300,
-        hedefX: 750, hedefY: 300,
-        kapilar: [
-            // Ortada yavaş dönen mavi kapı
-            // Math.PI / 4 = 45 derece başlangıç açısı
-            new DonenKapi(450, 300, 130, Math.PI / 4, 0.015, '#60d0ff')
-        ]
-    },
+  // Yükleniyor ekranını gizle
+  const yükleniyor = document.getElementById("yukleniyor");
+  yükleniyor.classList.add("gizli");
 
-    // SEVİYE 2 — İki kapı, farklı yönlerde dönüyorlar
-    {
-        topX: 150, topY: 150,
-        hedefX: 750, hedefY: 450,
-        kapilar: [
-            // Saat yönünde dönen pembe kapı (donusHizi pozitif)
-            new DonenKapi(350, 250, 110, 0, 0.02, '#ff60a0'),
-            // Saat yönünün tersine dönen mavi kapı (donusHizi negatif)
-            new DonenKapi(580, 380, 110, Math.PI / 2, -0.018, '#60d0ff')
-        ]
-    },
-
-    // SEVİYE 3 — Üç kapı, dar geçitler, farklı yüzeyler gerekli
-    {
-        topX: 150, topY: 500,
-        hedefX: 750, hedefY: 100,
-        kapilar: [
-            new DonenKapi(280, 300, 100, 0,            0.025, '#ff9060'),
-            new DonenKapi(500, 200, 120, Math.PI / 3, -0.02,  '#60d0ff'),
-            new DonenKapi(680, 400, 90,  Math.PI,      0.03,  '#ff60a0')
-        ]
-    }
-];
-
-
-// ------------------------------------------
-// 7. HUD GÜNCELLEME
-// HTML'deki bilgi çubuğundaki yazıları günceller.
-// document.getElementById ile HTML elementine ulaşıp
-// içeriğini değiştiriyoruz.
-// aktifYuzey değişkeni fizik.js'de tanımlanmıştır.
-// ------------------------------------------
-function hudGuncelle() {
-    document.getElementById('seviyeNo').innerText = kacinciSeviye + 1;
-    document.getElementById('hamleNo').innerText = kalanHamle;
-
-    // aktifYuzey fizik.js'den geliyor — hangi küp yüzündeyiz
-    // yerekimiYonleri de fizik.js'den — o yüzün yerçekimi yönü
-    let yer = yerekimiYonleri[aktifYuzey];
-    let yonYazi = '';
-    if (yer.y > 0) yonYazi = 'Aşağı ↓';
-    else if (yer.y < 0) yonYazi = 'Yukarı ↑';
-    else if (yer.x > 0) yonYazi = 'Sağa →';
-    else if (yer.x < 0) yonYazi = 'Sola ←';
-
-    document.getElementById('yuzAd').innerText = 'Yüzey ' + aktifYuzey + ' (' + yonYazi + ')';
-}
-
-
-// ------------------------------------------
-// 8. SEVİYEYİ HAZIRLA
-// Seçilen seviyenin verilerini oyuna uygular.
-// Topu ve hedefi doğru yere koyar, sayaçları sıfırlar.
-// ------------------------------------------
-function seviyeyiHazirla(indeks) {
-    let bolum = seviyeler[indeks];
-
-    // Topu başlangıç konumuna taşı ve durdur
-    topu.x = bolum.topX;
-    topu.y = bolum.topY;
-    topu.hizX = 0;
-    topu.hizY = 0;
-    topu.hareketEdiyor = false;
-
-    // Hedefi doğru yere koy
-    hedef.x = bolum.hedefX;
-    hedef.y = bolum.hedefY;
-
-    // Yüzeyi sıfırla — her seviyeye normal yerçekimiyle başla
-    // aktifYuzey fizik.js'de tanımlı, burada sıfırlıyoruz
-    aktifYuzey = 1;
-
-    // Hamle hakkını sıfırla
-    kalanHamle = 3;
-
-    hudGuncelle();
-}
-
-
-// ------------------------------------------
-// 9. FARE KONTROLLERİ — SAPAN MEKANİĞİ
-// Oyuncu fareyi basılı tutup çekip bırakır.
-// Bırakma noktası ile basma noktası arasındaki fark
-// topun hızını belirler — ne kadar çekersen o kadar hızlı.
-// ------------------------------------------
-let fareBasili = false;
-let cekisBaslangic = { x: 0, y: 0 };
-let cekisSon = { x: 0, y: 0 };
-
-// Fare tıklandığında — nişan almaya başla
-canvas.addEventListener('mousedown', function(e) {
-    // Oyun oynamıyorsa veya top zaten uçuyorsa atış yapma
-    if (oyunDurumu !== 'OYNANIYOR' || topu.hareketEdiyor) return;
-
-    fareBasili = true;
-    cekisBaslangic = { x: e.offsetX, y: e.offsetY };
-    cekisSon = { x: e.offsetX, y: e.offsetY };
+  // Başla butonuna tıklanınca oyunu devreye al
+  document.getElementById("basla-btn").addEventListener("click", oyunuBaşlat);
 });
 
-// Fare hareket edince — nişan çizgisini güncelle
-canvas.addEventListener('mousemove', function(e) {
-    if (!fareBasili) return;
-    cekisSon = { x: e.offsetX, y: e.offsetY };
+// ============================================================
+//  CANVAS YENİDEN BOYUTLANDIRMA
+//  Aktif matris döndükten sonra satır/sütun sayısı değişebilir.
+//  Canvas'ı buna göre güncelle.
+// ============================================================
+function kanvasYenidenBoyutla() {
+  matrisSatir = aktifMatris.length;
+  matrisSutun = aktifMatris[0].length;
+  kanvas.width  = matrisSutun * HUCRE_BOY;
+  kanvas.height = matrisSatir * HUCRE_BOY;
+}
+
+// ============================================================
+//  OYUNU BAŞLAT
+// ============================================================
+function oyunuBaşlat() {
+  // Overlay'i gizle
+  document.getElementById("baslangic-overlay").classList.add("gizli");
+
+  // Müziği başlat (tarayıcı ses politikası: tıklama sonrası çalışır)
+  sesMüzik.volume = 0.4;
+  sesMüzik.play().catch(() => { /* kullanıcı ses izni vermediyse sessiz devam */ });
+
+  oyunAktif = true;
+
+  // Oyun döngüsünü başlat
+  animasyonId = requestAnimationFrame(döngü);
+}
+
+// ============================================================
+//  KLAVYE DİNLEYİCİLERİ
+// ============================================================
+document.addEventListener("keydown", (e) => {
+  switch (e.code) {
+    case "ArrowLeft":  case "KeyA": tuşlar.sol   = true;  break;
+    case "ArrowRight": case "KeyD": tuşlar.sağ   = true;  break;
+    case "ArrowUp": case "KeyW": case "Space":
+      tuşlar.zıpla = true;
+      // Boşluk çubuğunun sayfayı kaydırmasını engelle
+      e.preventDefault();
+      break;
+  }
 });
 
-// Fare bırakılınca — topu fırlat
-canvas.addEventListener('mouseup', function(e) {
-    if (!fareBasili) return;
-    fareBasili = false;
-
-    // Hız = (bırakma - basma) * güç katsayısı
-    // 0.12 katsayısı çok hızlı gitmemesi için ayarlandı
-    let gucKatsayi = 0.12;
-    topu.hizX = (e.offsetX - cekisBaslangic.x) * gucKatsayi;
-    topu.hizY = (e.offsetY - cekisBaslangic.y) * gucKatsayi;
-
-    // Maksimum hız sınırı — Math.hypot iki kenardan hipotenüsü bulur
-    // yani hız vektörünün büyüklüğünü hesaplar
-    let toplamHiz = Math.hypot(topu.hizX, topu.hizY);
-    if (toplamHiz > 18) {
-        // Oranı koruyarak 18'e düşür
-        topu.hizX = (topu.hizX / toplamHiz) * 18;
-        topu.hizY = (topu.hizY / toplamHiz) * 18;
-    }
-
-    topu.hareketEdiyor = true;
-    kalanHamle--;
-    hudGuncelle();
+document.addEventListener("keyup", (e) => {
+  switch (e.code) {
+    case "ArrowLeft":  case "KeyA": tuşlar.sol   = false; break;
+    case "ArrowRight": case "KeyD": tuşlar.sağ   = false; break;
+    case "ArrowUp": case "KeyW": case "Space":
+      tuşlar.zıpla    = false;
+      zıplamaBasıldı  = false;  // tuş bırakılınca bir sonraki basışa izin ver
+      break;
+  }
 });
 
+// ============================================================
+//  ANA OYUN DÖNGÜSÜ
+// ============================================================
+function döngü() {
+  if (!oyunAktif) return;
 
-// ------------------------------------------
-// 10. KLAVYE KONTROLLERİ
-// R = seviyeyi yeniden başlat
-// ESC = duraklat / devam et
-// ------------------------------------------
-document.addEventListener('keydown', function(e) {
-    let tus = e.key.toLowerCase();
+  güncelle();   // fizik ve mantık
+  çiz();        // render
 
-    if (tus === 'r' && oyunDurumu === 'OYNANIYOR') {
-        seviyeyiHazirla(kacinciSeviye);
+  animasyonId = requestAnimationFrame(döngü);
+}
+
+// ============================================================
+//  GÜNCELLE — Her karede çağrılır (fizik + mantık)
+// ============================================================
+function güncelle() {
+  // Geçiş animasyonu sırasında oyuncu kontrolü dondur
+  if (geçişAnim.aktif) {
+    geçişAnim.sayaç++;
+    if (geçişAnim.sayaç >= geçişAnim.süre) {
+      geçişAnim.aktif  = false;
+      geçişAnim.sayaç  = 0;
     }
+    return; // fizik güncellemesi yapılmaz
+  }
 
-    if (tus === 'escape') {
-        if (oyunDurumu === 'OYNANIYOR') {
-            oyunDurumu = 'DURDURULDU';
-            document.getElementById('duraklatEkrani').classList.remove('gizli');
-        } else if (oyunDurumu === 'DURDURULDU') {
-            oyunDurumu = 'OYNANIYOR';
-            document.getElementById('duraklatEkrani').classList.add('gizli');
-        }
+  // ─── Yatay hareket ───
+  if (tuşlar.sol)  topumuz.hizX -= HAREKET_HIZI * 0.4;
+  if (tuşlar.sağ) topumuz.hizX += HAREKET_HIZI * 0.4;
+
+  // Hız sınırı
+  topumuz.hizX = Math.max(-HAREKET_HIZI, Math.min(HAREKET_HIZI, topumuz.hizX));
+
+  // Sürtünme uygula
+  const sürtünme = topumuz.yerde ? SÜRTÜNME : HAVA_SÜRTÜNMESI;
+  if (!tuşlar.sol && !tuşlar.sağ) {
+    topumuz.hizX *= sürtünme;
+    // Çok küçük hızları sıfırla (titreme önleme)
+    if (Math.abs(topumuz.hizX) < 0.05) topumuz.hizX = 0;
+  }
+
+  // ─── Zıplama ───
+  if (tuşlar.zıpla && topumuz.yerde && !zıplamaBasıldı) {
+    topumuz.hizY       = ZIPLAMA_GUCU;
+    topumuz.yerde      = false;
+    zıplamaBasıldı = true;
+    topumuz.atlama++;
+    // Squish: zıplayınca yatay genişle
+    topumuz.squishX = 1.3;
+    topumuz.squishY = 0.7;
+    // HUD güncelle
+    document.getElementById("hud-atlama").textContent = topumuz.atlama;
+  }
+
+  // ─── Yerçekimi ───
+  topumuz.hizY += YERÇEKIMI;
+  topumuz.hizY  = Math.min(topumuz.hizY, MAX_DÜŞÜŞ_HIZI);
+
+  // ─── Squish animasyonunu normalize et ───
+  topumuz.squishX += (1.0 - topumuz.squishX) * SQUISH_GERİ;
+  topumuz.squishY += (1.0 - topumuz.squishY) * SQUISH_GERİ;
+  // Aşırı salınımı kes
+  if (Math.abs(topumuz.squishX - 1.0) < 0.01) topumuz.squishX = 1.0;
+  if (Math.abs(topumuz.squishY - 1.0) < 0.01) topumuz.squishY = 1.0;
+
+  // ─── Hareket ve Çarpışma ───
+  // Önce yatay, sonra dikey eksende ayrı ayrı çözümlenir.
+  // Bu yöntem "süpürme" hatasını en aza indirir.
+  hareketVeÇarpışma();
+
+  // ─── Kenar geçiş kontrolü ───
+  kenarGeçişKontrol();
+}
+
+// ============================================================
+//  HAREKET VE ÇARPIŞMA
+//  AABB (Axis-Aligned Bounding Box) tabanlı,
+//  önce X sonra Y ekseninde ayrı ayrı çözülür.
+// ============================================================
+function hareketVeÇarpışma() {
+  const r = topumuz.yariçap;
+
+  // ── Yatay hareket ──
+  topumuz.x += topumuz.hizX;
+
+  // Yatay çarpışma: topun sol ve sağ taraflarını kontrol et
+  if (topumuz.hizX !== 0) {
+    const çarpışma = yatayÇarpışmaVar(topumuz.x, topumuz.y, r);
+    if (çarpışma) {
+      // Topu bloğun kenarına yasla
+      if (topumuz.hizX > 0) {
+        // Sağa gidiyordu, sağ kenarda çarpıştı
+        topumuz.x  = çarpışma.blokSolX - r - 0.01;
+      } else {
+        // Sola gidiyordu, sol kenarda çarpıştı
+        topumuz.x  = çarpışma.blokSağX + r + 0.01;
+      }
+      topumuz.hizX = 0;
     }
-});
+  }
 
+  // ── Dikey hareket ──
+  topumuz.y    += topumuz.hizY;
+  topumuz.yerde = false;
 
-// ------------------------------------------
-// 11. ÇİZİM FONKSİYONLARI
-// Her frame ekran tamamen silinip yeniden çizilir.
-// Bu "dirty rect" değil "full repaint" yaklaşımıdır —
-// basit ama 60fps'de sorunsuz çalışır.
-// ------------------------------------------
-
-// Arkaplanı çiz — koyu zemin + ızgara deseni
-function arkaplanCiz() {
-    cizim.fillStyle = '#0d0d1a';
-    cizim.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Izgara çizgileri — oyuna derinlik hissi verir
-    cizim.strokeStyle = 'rgba(50, 50, 90, 0.35)';
-    cizim.lineWidth = 1;
-    for (let i = 0; i < canvas.width; i += 40) {
-        cizim.beginPath();
-        cizim.moveTo(i, 0);
-        cizim.lineTo(i, canvas.height);
-        cizim.stroke();
+  const dikeyÇarpışma = dikeyÇarpışmaVar(topumuz.x, topumuz.y, r);
+  if (dikeyÇarpışma) {
+    if (topumuz.hizY > 0) {
+      // Aşağı gidiyordu, zemine çarptı
+      topumuz.y     = dikeyÇarpışma.blokÜstY - r - 0.01;
+      topumuz.yerde = true;
+      // Zemine çarparken squish uygula
+      const çarpmaHızı = Math.abs(topumuz.hizY);
+      if (çarpmaHızı > 3) {
+        topumuz.squishY = 1 - Math.min(çarpmaHızı * SQUISH_ÇARPAN * 0.07, 0.4);
+        topumuz.squishX = 1 + Math.min(çarpmaHızı * SQUISH_ÇARPAN * 0.07, 0.4);
+      }
+      topumuz.hizY  = 0;
+    } else {
+      // Yukarı gidiyordu, tavana çarptı
+      topumuz.y    = dikeyÇarpışma.blokAltY + r + 0.01;
+      topumuz.hizY = 0;
     }
-    for (let i = 0; i < canvas.height; i += 40) {
-        cizim.beginPath();
-        cizim.moveTo(0, i);
-        cizim.lineTo(canvas.width, i);
-        cizim.stroke();
+  }
+}
+
+// ─── Yatay çarpışma yardımcısı ───
+// Topun x,y merkezinden yatay yönde solid blok var mı?
+// Varsa bloğun sol/sağ kenar piksel değerlerini döner.
+function yatayÇarpışmaVar(x, y, r) {
+  // Topun kaplayacağı 4 köşeyi kontrol et
+  const kontrolNoktalari = [
+    { cx: x + (topumuz.hizX > 0 ? r : -r), cy: y - r * 0.8 },
+    { cx: x + (topumuz.hizX > 0 ? r : -r), cy: y },
+    { cx: x + (topumuz.hizX > 0 ? r : -r), cy: y + r * 0.8 },
+  ];
+
+  for (const n of kontrolNoktalari) {
+    const blok = pikseldenBlokAl(n.cx, n.cy);
+    if (blok && katıMı(blok.satır, blok.sütun)) {
+      return {
+        blokSolX: blok.sütun       * HUCRE_BOY,
+        blokSağX: (blok.sütun + 1) * HUCRE_BOY,
+      };
     }
+  }
+  return null;
 }
 
-// Yerçekimi yönünü ekranda ok ile göster
-// Oyuncu hangi yüzeyde olduğunu anlasın
-function yerekimiOkuCiz() {
-    let yer = yerekimiYonleri[aktifYuzey]; // fizik.js'den geliyor
-    let okX = canvas.width - 60;
-    let okY = 60;
-    let buyukluk = 30;
+// ─── Dikey çarpışma yardımcısı ───
+function dikeyÇarpışmaVar(x, y, r) {
+  const kontrolNoktalari = [
+    { cx: x - r * 0.8, cy: y + (topumuz.hizY > 0 ? r : -r) },
+    { cx: x,           cy: y + (topumuz.hizY > 0 ? r : -r) },
+    { cx: x + r * 0.8, cy: y + (topumuz.hizY > 0 ? r : -r) },
+  ];
 
-    // Ok gövdesi
-    cizim.beginPath();
-    cizim.moveTo(okX, okY);
-    cizim.lineTo(okX + yer.x * buyukluk * 2, okY + yer.y * buyukluk * 2);
-    cizim.strokeStyle = '#ffdd60';
-    cizim.lineWidth = 3;
-    cizim.stroke();
-
-    // Ok ucu (küçük daire)
-    cizim.beginPath();
-    cizim.arc(okX + yer.x * buyukluk * 2, okY + yer.y * buyukluk * 2, 5, 0, Math.PI * 2);
-    cizim.fillStyle = '#ffdd60';
-    cizim.fill();
-
-    // Etiket
-    cizim.fillStyle = '#ffdd60';
-    cizim.font = '11px Courier New';
-    cizim.fillText('YERÇEKİMİ', okX - 20, okY - 12);
-}
-
-// Hedefi çiz — yeşil parlayan daire
-function hedefiCiz() {
-    // Dış parlama halkası
-    cizim.beginPath();
-    cizim.arc(hedef.x, hedef.y, hedef.r + 8, 0, Math.PI * 2);
-    cizim.strokeStyle = 'rgba(96, 255, 144, 0.25)';
-    cizim.lineWidth = 5;
-    cizim.stroke();
-
-    // İç dolu daire
-    cizim.beginPath();
-    cizim.arc(hedef.x, hedef.y, hedef.r, 0, Math.PI * 2);
-    cizim.fillStyle = 'rgba(96, 255, 144, 0.2)';
-    cizim.fill();
-    cizim.strokeStyle = '#60ff90';
-    cizim.lineWidth = 2;
-    cizim.stroke();
-}
-
-// Topu çiz — rengi aktif yüzeyin yerçekimi yönüne göre değişir
-function topuCiz() {
-    // Aktif yüzeye göre renk seç — fizik.js'deki yerekimiYonleri'nden al
-    let yer = yerekimiYonleri[aktifYuzey];
-    let topRenk = '#a090ff'; // varsayılan mor
-    if (yer.y > 0) topRenk = '#a090ff';      // normal — mor
-    else if (yer.y < 0) topRenk = '#60d0ff'; // ters yerçekimi — mavi
-    else if (yer.x > 0) topRenk = '#ff9060'; // sağa çekim — turuncu
-    else if (yer.x < 0) topRenk = '#ff60a0'; // sola çekim — pembe
-
-    // Işıma efekti — shadowBlur ile neon görünümü
-    cizim.shadowColor = topRenk;
-    cizim.shadowBlur = 18;
-
-    cizim.beginPath();
-    cizim.arc(topu.x, topu.y, topu.r, 0, Math.PI * 2);
-    cizim.fillStyle = topRenk;
-    cizim.fill();
-
-    // Parlak iç nokta — topun küresel göründüğü his verir
-    cizim.shadowBlur = 0; // İç nokta için ışımayı kapat
-    cizim.beginPath();
-    cizim.arc(topu.x - topu.r * 0.3, topu.y - topu.r * 0.3, topu.r * 0.35, 0, Math.PI * 2);
-    cizim.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    cizim.fill();
-
-    cizim.shadowBlur = 0;
-}
-
-// Nişan çizgisi — fare basılıyken toptan imleç yönüne kesik çizgi
-function nisanCiz() {
-    if (!fareBasili || topu.hareketEdiyor) return;
-
-    cizim.beginPath();
-    cizim.moveTo(topu.x, topu.y);
-    cizim.lineTo(cekisSon.x, cekisSon.y);
-    cizim.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-    cizim.lineWidth = 2;
-    cizim.setLineDash([6, 6]); // Kesik çizgi: 6px çiz, 6px boş bırak
-    cizim.stroke();
-    cizim.setLineDash([]); // Sıfırla — diğer çizimler etkilenmesin
-}
-
-// Küp HUD — sol üst köşede hangi yüzeyde olduğumuzu gösterir
-// İzometrik küp çizimi: 3 paralel kenar şeklinde
-function kupHudCiz() {
-    let mx = 70;  // Küpün merkez X
-    let my = 70;  // Küpün merkez Y
-    let b = 22;   // Kenar uzunluğu
-
-    // İzometrik küp için 3 görünen yüzün köşe noktaları
-    // Üst yüz — paralelkenar
-    let ustOrta  = { x: mx,     y: my - b };
-    let ustSag   = { x: mx + b, y: my - b/2 };
-    let ustMerkez= { x: mx,     y: my };
-    let ustSol   = { x: mx - b, y: my - b/2 };
-
-    // Sol alt yüz
-    let solAlt   = { x: mx - b, y: my + b/2 };
-
-    // Sağ alt yüz
-    let sagAlt   = { x: mx + b, y: my + b/2 };
-
-    // Alt orta
-    let altOrta  = { x: mx,     y: my + b };
-
-    // Aktif yüzeyi parlat, diğerlerini koyu göster
-    // Yüzey numarası ile hangi kısım parlayacak eşleştiriliyor
-    let parlak = 'rgba(160, 144, 255, 0.8)';
-    let koyu   = 'rgba(40, 40, 80, 0.8)';
-
-    // Üst yüz (yüzey 3)
-    cizim.beginPath();
-    cizim.moveTo(ustOrta.x,   ustOrta.y);
-    cizim.lineTo(ustSag.x,    ustSag.y);
-    cizim.lineTo(ustMerkez.x, ustMerkez.y);
-    cizim.lineTo(ustSol.x,    ustSol.y);
-    cizim.closePath();
-    cizim.fillStyle = (aktifYuzey === 3) ? parlak : koyu;
-    cizim.fill();
-    cizim.strokeStyle = '#6060aa';
-    cizim.lineWidth = 1;
-    cizim.stroke();
-
-    // Sol yüz (yüzey 5)
-    cizim.beginPath();
-    cizim.moveTo(ustSol.x,    ustSol.y);
-    cizim.lineTo(ustMerkez.x, ustMerkez.y);
-    cizim.lineTo(altOrta.x,   altOrta.y);
-    cizim.lineTo(solAlt.x,    solAlt.y);
-    cizim.closePath();
-    cizim.fillStyle = (aktifYuzey === 5) ? parlak : koyu;
-    cizim.fill();
-    cizim.stroke();
-
-    // Sağ yüz (yüzey 2)
-    cizim.beginPath();
-    cizim.moveTo(ustMerkez.x, ustMerkez.y);
-    cizim.lineTo(ustSag.x,    ustSag.y);
-    cizim.lineTo(sagAlt.x,    sagAlt.y);
-    cizim.lineTo(altOrta.x,   altOrta.y);
-    cizim.closePath();
-    cizim.fillStyle = (aktifYuzey === 2) ? parlak : koyu;
-    cizim.fill();
-    cizim.stroke();
-
-    // Yüzey numarasını küpün altına yaz
-    cizim.fillStyle = '#c0b8ff';
-    cizim.font = '11px Courier New';
-    cizim.fillText('YÜZ: ' + aktifYuzey, mx - 18, my + b + 18);
-}
-
-// Ana çizim fonksiyonu — her frame çağrılır
-function ekraniCiz() {
-    arkaplanCiz();
-
-    // Oyun ekranındayken objeleri çiz
-    if (oyunDurumu === 'OYNANIYOR' || oyunDurumu === 'DURDURULDU') {
-        let bolum = seviyeler[kacinciSeviye];
-
-        hedefiCiz();
-
-        // Tüm kapıları çiz
-        for (let i = 0; i < bolum.kapilar.length; i++) {
-            bolum.kapilar[i].ciz();
-        }
-
-        topuCiz();
-        nisanCiz();
-        yerekimiOkuCiz(); // Sağ üstte yerçekimi oku
-        kupHudCiz();      // Sol üstte küp göstergesi
+  for (const n of kontrolNoktalari) {
+    const blok = pikseldenBlokAl(n.cx, n.cy);
+    if (blok && katıMı(blok.satır, blok.sütun)) {
+      return {
+        blokÜstY: blok.satır       * HUCRE_BOY,
+        blokAltY: (blok.satır + 1) * HUCRE_BOY,
+      };
     }
+  }
+  return null;
 }
 
+// ─── Piksel koordinatından matris hücresini bul ───
+function pikseldenBlokAl(px, py) {
+  const sütun = Math.floor(px / HUCRE_BOY);
+  const satır  = Math.floor(py / HUCRE_BOY);
+  if (satır < 0 || satır >= matrisSatir) return null;
+  if (sütun < 0 || sütun >= matrisSutun) return null;
+  return { satır, sütun };
+}
 
-// ------------------------------------------
-// 12. ANA OYUN DÖNGÜSÜ
-// requestAnimationFrame tarayıcının ekran
-// yenileme hızına (genellikle 60fps) göre
-// bu fonksiyonu tekrar tekrar çağırır.
-// Sıra: fizik güncelle → çarpışmaları kontrol et → ekranı çiz → tekrar et
-// ------------------------------------------
-function anaDongu() {
+// ─── Hücre katı blok mu? ───
+function katıMı(satır, sütun) {
+  if (satır < 0 || satır >= matrisSatir) return false;
+  if (sütun < 0 || sütun >= matrisSutun) return false;
+  const değer = aktifMatris[satır][sütun];
+  return değer === HUCRE.DUVAR || değer === HUCRE.PORTAL;
+}
 
-    if (oyunDurumu === 'OYNANIYOR') {
-        let bolum = seviyeler[kacinciSeviye];
+// ============================================================
+//  KENAR GEÇİŞ KONTROL
+//  Top ekran dışına çıkıyor mu? Hangi kenara?
+//  Porta mı yoksa sağ-sol döngüsü mü?
+// ============================================================
+function kenarGeçişKontrol() {
+  const genişlik  = matrisSutun * HUCRE_BOY;
+  const yükseklik = matrisSatir * HUCRE_BOY;
+  const r         = topumuz.yariçap;
 
-        // Kapıları döndür
-        for (let i = 0; i < bolum.kapilar.length; i++) {
-            bolum.kapilar[i].guncelle();
-        }
-
-        // Topu hareket ettir — fizik.js'den geliyor
-        // Yerçekimi ve sürtünmeyi uygular, konumu günceller
-        topuHarekettir(top);
-
-        // Ekran sınırlarını kontrol et — fizik.js'den geliyor
-        // Kenara çarparsa yüzey geçişi tetikleyebilir
-        sinirKontrol(top, canvas.width, canvas.height);
-
-        // Kapılara çarpma kontrolü
-        for (let i = 0; i < bolum.kapilar.length; i++) {
-            let kapi = bolum.kapilar[i];
-            let uclar = kapi.uclariGetir();
-
-            // carpismavar() fizik.js'den geliyor — daire+çizgi kesişimi
-            if (carpismavar(top, uclar)) {
-
-                // hiziYansit() fizik.js'den geliyor — yansıma formülü
-                hiziYansit(top, kapi.aci);
-
-                // Topun kapının içine gömülmesini engelle
-                topu.x += topu.hizX * 2;
-                topu.y += topu.hizY * 2;
-            }
-        }
-
-        // Hedefe ulaşıldı mı?
-        // Math.hypot = iki nokta arasındaki mesafe (Pisagor teoremi)
-        let mesafe = Math.hypot(topu.x - hedef.x, topu.y - hedef.y);
-        if (mesafe < topu.r + hedef.r) {
-            topu.hareketEdiyor = false;
-
-            // Başka seviye var mı?
-            if (kacinciSeviye + 1 < seviyeler.length) {
-                kacinciSeviye++;
-                // 1 saniye bekleyip sonraki seviyeye geç
-                setTimeout(function() {
-                    seviyeyiHazirla(kacinciSeviye);
-                }, 1000);
-            } else {
-                // Tüm seviyeler bitti
-                oyunDurumu = 'BITTI';
-                document.getElementById('bitisEkrani').classList.remove('gizli');
-            }
-        }
-
-        // Top durdu ve hamle kalmadıysa seviyeyi sıfırla
-        if (!topu.hareketEdiyor && kalanHamle <= 0) {
-            setTimeout(function() {
-                seviyeyiHazirla(kacinciSeviye);
-            }, 800);
-        }
-
-        hudGuncelle();
+  // ── SAĞ KENAR ──
+  if (topumuz.x - r > genişlik) {
+    // Önce portal var mı bak
+    const normPozisyon = topumuz.y / yükseklik;
+    const portal = portalBul(mevcutOda, "SAG", normPozisyon);
+    if (portal) {
+      portalGeçişYap(portal);
+    } else {
+      // Yoksa sağ-sol döngüsel geçiş
+      const geçiş = sagGecisAl(mevcutOda);
+      döngüselGeçişYap(geçiş.hedefOda, geçiş.donus, "sağ");
     }
+    return;
+  }
 
-    // Ekranı çiz (duraklatılmışsa da çizilsin)
-    ekraniCiz();
+  // ── SOL KENAR ──
+  if (topumuz.x + r < 0) {
+    const normPozisyon = topumuz.y / yükseklik;
+    const portal = portalBul(mevcutOda, "SOL", normPozisyon);
+    if (portal) {
+      portalGeçişYap(portal);
+    } else {
+      const geçiş = solGecisAl(mevcutOda);
+      döngüselGeçişYap(geçiş.hedefOda, geçiş.donus, "sol");
+    }
+    return;
+  }
 
-    // Döngüyü devam ettir
-    requestAnimationFrame(anaDongu);
+  // ── ÜST KENAR ──
+  if (topumuz.y + r < 0) {
+    const normPozisyon = topumuz.x / genişlik;
+    const portal = portalBul(mevcutOda, "UST", normPozisyon);
+    if (portal) {
+      portalGeçişYap(portal);
+    } else {
+      // Üst kenarda portal yoksa topu geri it (tavan gibi davran)
+      topumuz.y    = r + 1;
+      topumuz.hizY = Math.abs(topumuz.hizY) * 0.4;
+    }
+    return;
+  }
+
+  // ── ALT KENAR ──
+  if (topumuz.y - r > yükseklik) {
+    const normPozisyon = topumuz.x / genişlik;
+    const portal = portalBul(mevcutOda, "ALT", normPozisyon);
+    if (portal) {
+      portalGeçişYap(portal);
+    } else {
+      // Alt kenarda portal yoksa topu geri tut (zemin gibi)
+      topumuz.y    = yükseklik - r - 1;
+      topumuz.hizY = 0;
+      topumuz.yerde = true;
+    }
+    return;
+  }
 }
 
+// ============================================================
+//  DÖNGÜSEL GEÇİŞ (Sağ-Sol arası oda değişimi)
+//  Harita döndürülmez (donus: 0), top karşı kenardan girer.
+// ============================================================
+function döngüselGeçişYap(hedefOda, dönüş, yön) {
+  // Ses çal
+  sesÇal(sesGeçiş);
 
-// ------------------------------------------
-// 13. HTML BUTON OLAYLARI
-// Ekrandaki butonlara tıklanınca ne olacağını tanımlar.
-// classList.add('gizli') = ekranı gizle
-// classList.remove('gizli') = ekranı göster
-// ------------------------------------------
+  // Oda ve dönüşü güncelle
+  mevcutOda   = hedefOda;
+  haritaDönüş = dönüş;
 
-document.getElementById('baslatButon').addEventListener('click', function() {
-    document.getElementById('baslangicEkrani').classList.add('gizli');
-    document.getElementById('hud').classList.remove('gizli');
-    kacinciSeviye = 0;
-    oyunDurumu = 'OYNANIYOR';
-    seviyeyiHazirla(0);
-});
+  // Yeni aktif matrisi hesapla
+  aktifMatris = matrisDondur(odaMatrisiAl(mevcutOda), haritaDönüş);
+  kanvasYenidenBoyutla();
 
-document.getElementById('devamButon').addEventListener('click', function() {
-    oyunDurumu = 'OYNANIYOR';
-    document.getElementById('duraklatEkrani').classList.add('gizli');
-});
+  const genişlik  = matrisSutun * HUCRE_BOY;
+  const yükseklik = matrisSatir * HUCRE_BOY;
+  const r         = topumuz.yariçap;
 
-document.getElementById('tekrarButon').addEventListener('click', function() {
-    document.getElementById('bitisEkrani').classList.add('gizli');
-    kacinciSeviye = 0;
-    oyunDurumu = 'OYNANIYOR';
-    seviyeyiHazirla(0);
-});
+  // Topu karşı kenardan giriş yaptır
+  if (yön === "sağ") {
+    // Sağdan çıktı → yeni odanın solundan gir
+    topumuz.x = r + 2;
+  } else {
+    // Soldan çıktı → yeni odanın sağından gir
+    topumuz.x = genişlik - r - 2;
+  }
 
+  // Y pozisyonu korunur (aynı yükseklikte giriş)
+  topumuz.y = Math.max(r + 2, Math.min(topumuz.y, yükseklik - r - 2));
 
-// ------------------------------------------
-// 14. MOTORU BAŞLAT
-// Döngüyü ilk kez çalıştır — program burada hayata girer
-// ------------------------------------------
-anaDongu();
+  // Geçiş animasyonunu başlat
+  geçişAnim.aktif  = true;
+  geçişAnim.sayaç  = 0;
+  geçişAnim.yön    = yön;
+
+  // HUD güncelle
+  hudGüncelle();
+}
+
+// ============================================================
+//  PORTAL GEÇİŞİ (Üst/Alt kenardaki özel ışınlama)
+//  Harita döndürülür, top hedef kenara yerleştirilir.
+// ============================================================
+function portalGeçişYap(portal) {
+  // Ses çal
+  sesÇal(sesGeçiş);
+
+  const hedef = portal.hedef;
+
+  // Oda ve dönüşü güncelle
+  mevcutOda   = hedef.oda;
+  haritaDönüş = portal.donus;
+
+  // Yeni aktif matrisi döndürülmüş şekilde hesapla
+  aktifMatris = matrisDondur(odaMatrisiAl(mevcutOda), haritaDönüş);
+  kanvasYenidenBoyutla();
+
+  const genişlik  = matrisSutun * HUCRE_BOY;
+  const yükseklik = matrisSatir * HUCRE_BOY;
+  const r         = topumuz.yariçap;
+
+  // Topu hedef kenar ve pozisyona yerleştir
+  switch (hedef.kenar) {
+    case "SOL":
+      topumuz.x = r + 2;
+      topumuz.y = hedef.pozisyon * yükseklik;
+      topumuz.hizX = Math.abs(topumuz.hizX) + 2;   // içe doğru momentum
+      break;
+    case "SAG":
+      topumuz.x = genişlik - r - 2;
+      topumuz.y = hedef.pozisyon * yükseklik;
+      topumuz.hizX = -(Math.abs(topumuz.hizX) + 2);
+      break;
+    case "UST":
+      topumuz.x = hedef.pozisyon * genişlik;
+      topumuz.y = r + 2;
+      topumuz.hizY = Math.abs(topumuz.hizY) * 0.5;
+      break;
+    case "ALT":
+      topumuz.x = hedef.pozisyon * genişlik;
+      topumuz.y = yükseklik - r - 2;
+      topumuz.hizY = 0;
+      topumuz.yerde = true;
+      break;
+  }
+
+  // Sınır içinde tut
+  topumuz.x = Math.max(r + 2, Math.min(topumuz.x, genişlik - r - 2));
+  topumuz.y = Math.max(r + 2, Math.min(topumuz.y, yükseklik - r - 2));
+
+  // Geçiş animasyonu
+  geçişAnim.aktif  = true;
+  geçişAnim.sayaç  = 0;
+  geçişAnim.yön    = "portal";
+
+  // HUD güncelle
+  hudGüncelle();
+}
+
+// ============================================================
+//  TOPU SIFIRLA — Başlangıç pozisyonuna yerleştir
+// ============================================================
+function topuSıfırla() {
+  const genişlik  = matrisSutun * HUCRE_BOY;
+  const yükseklik = matrisSatir * HUCRE_BOY;
+
+  // Başlangıç: yatayda orta, dikeyde zemine yakın
+  topumuz.x     = genişlik  * 0.15;
+  topumuz.y     = yükseklik - HUCRE_BOY * 2;
+  topumuz.hizX  = 0;
+  topumuz.hizY  = 0;
+  topumuz.yerde = false;
+}
+
+// ============================================================
+//  HUD GÜNCELLE — Başlık bandındaki durum göstergesi
+// ============================================================
+function hudGüncelle() {
+  document.getElementById("hud-oda").textContent   = mevcutOda;
+  document.getElementById("hud-donus").textContent = haritaDönüş + "°";
+
+  // Mini oda listesi — aktif odayı vurgula
+  for (let i = 1; i <= 6; i++) {
+    const el = document.getElementById(`oda-mini-${i}`);
+    if (el) {
+      el.classList.toggle("aktif", i === mevcutOda);
+    }
+  }
+}
+
+// ============================================================
+//  SES YARDIMCI — Sesi baştan çal, hata varsa sessiz geç
+// ============================================================
+function sesÇal(sesEl) {
+  try {
+    sesEl.currentTime = 0;
+    sesEl.play().catch(() => {});
+  } catch (_) {}
+}
+
+// ============================================================
+//  ÇİZ — Her karede canvas'ı sıfırdan render et
+// ============================================================
+function çiz() {
+  const genişlik  = kanvas.width;
+  const yükseklik = kanvas.height;
+
+  // ── Arkaplanı temizle ──
+  ctx.fillStyle = RENKLER.arkaplan;
+  ctx.fillRect(0, 0, genişlik, yükseklik);
+
+  // ── Grid çizgilerini çiz (hafif görünür) ──
+  gridÇiz(genişlik, yükseklik);
+
+  // ── Harita bloklarını çiz ──
+  haritaÇiz();
+
+  // ── Geçiş animasyonu efekti (beyaz flash) ──
+  if (geçişAnim.aktif) {
+    const t = 1 - geçişAnim.sayaç / geçişAnim.süre;  // 1→0 arası
+    ctx.fillStyle = `rgba(120, 100, 255, ${t * 0.35})`;
+    ctx.fillRect(0, 0, genişlik, yükseklik);
+  }
+
+  // ── Topu çiz ──
+  topuÇiz();
+
+  // ── Kenar göstergelerini çiz (hangi kenarda geçiş var?) ──
+  kenarGöstergeÇiz(genişlik, yükseklik);
+}
+
+// ─── Grid çizgisi render ───
+function gridÇiz(genişlik, yükseklik) {
+  ctx.strokeStyle = RENKLER.grid;
+  ctx.lineWidth   = 0.5;
+  ctx.beginPath();
+  for (let s = 0; s <= matrisSutun; s++) {
+    ctx.moveTo(s * HUCRE_BOY, 0);
+    ctx.lineTo(s * HUCRE_BOY, yükseklik);
+  }
+  for (let r = 0; r <= matrisSatir; r++) {
+    ctx.moveTo(0, r * HUCRE_BOY);
+    ctx.lineTo(genişlik, r * HUCRE_BOY);
+  }
+  ctx.stroke();
+}
+
+// ─── Harita blok render ───
+function haritaÇiz() {
+  for (let r = 0; r < matrisSatir; r++) {
+    for (let s = 0; s < matrisSutun; s++) {
+      const değer  = aktifMatris[r][s];
+      const px     = s * HUCRE_BOY;
+      const py     = r * HUCRE_BOY;
+
+      if (değer === HUCRE.DUVAR) {
+        // Dolgu
+        ctx.fillStyle = RENKLER.duvar;
+        ctx.fillRect(px, py, HUCRE_BOY, HUCRE_BOY);
+        // Üst kenar vurgusu (3B hissi)
+        ctx.fillStyle = RENKLER.duvarKenar;
+        ctx.fillRect(px, py, HUCRE_BOY, 3);
+        ctx.fillRect(px, py, 3, HUCRE_BOY);
+
+      } else if (değer === HUCRE.PORTAL) {
+        // Portal hücresi — parlak kırmızı
+        ctx.fillStyle = RENKLER.portalPark;
+        ctx.fillRect(px, py, HUCRE_BOY, HUCRE_BOY);
+        ctx.strokeStyle = RENKLER.portal;
+        ctx.lineWidth   = 2;
+        ctx.strokeRect(px + 1, py + 1, HUCRE_BOY - 2, HUCRE_BOY - 2);
+        // İç parlama
+        const grad = ctx.createRadialGradient(
+          px + HUCRE_BOY / 2, py + HUCRE_BOY / 2, 2,
+          px + HUCRE_BOY / 2, py + HUCRE_BOY / 2, HUCRE_BOY * 0.7
+        );
+        grad.addColorStop(0, "rgba(255,80,120,0.5)");
+        grad.addColorStop(1, "rgba(255,80,120,0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(px, py, HUCRE_BOY, HUCRE_BOY);
+      }
+    }
+  }
+}
+
+// ─── Top render ───
+function topuÇiz() {
+  const cx = topumuz.x;
+  const cy = topumuz.y;
+  const rx = topumuz.yariçap * topumuz.squishX;   // yatay yarıçap (squish)
+  const ry = topumuz.yariçap * topumuz.squishY;   // dikey yarıçap (squish)
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // Gölge
+  ctx.beginPath();
+  ctx.ellipse(2, 3, rx * 0.9, ry * 0.5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.fill();
+
+  // Ana top gövdesi (radyal gradyan)
+  const grad = ctx.createRadialGradient(-rx * 0.3, -ry * 0.3, rx * 0.1, 0, 0, rx);
+  grad.addColorStop(0, RENKLER.topParıltı);
+  grad.addColorStop(0.4, RENKLER.top);
+  grad.addColorStop(1, RENKLER.topGölge);
+
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Parlak nokta (sol üst)
+  ctx.beginPath();
+  ctx.ellipse(-rx * 0.25, -ry * 0.28, rx * 0.22, ry * 0.18, -Math.PI / 5, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// ─── Kenar geçiş göstergesi ───
+// Sağ ve sol kenarlarda geçiş yönünü işaret eden ince şeritler çizer.
+// Portal olan kenarlarda kırmızı işaret gösterir.
+function kenarGöstergeÇiz(genişlik, yükseklik) {
+  const kalınlık = 4;
+
+  // Sağ kenar — her zaman döngüsel geçiş var
+  const sağRenk = "rgba(124,106,240,0.6)";
+  ctx.fillStyle = sağRenk;
+  ctx.fillRect(genişlik - kalınlık, 0, kalınlık, yükseklik);
+
+  // Sol kenar
+  ctx.fillRect(0, 0, kalınlık, yükseklik);
+
+  // Portaller için üst/alt kenar göstergesi
+  for (const portal of portaller) {
+    if (portal.kaynak.oda !== mevcutOda) continue;
+
+    const pos = portal.kaynak.pozisyon;
+
+    ctx.fillStyle = RENKLER.portal;
+
+    if (portal.kaynak.kenar === "UST") {
+      const merkez = pos * genişlik;
+      ctx.fillRect(merkez - 20, 0, 40, 6);
+    } else if (portal.kaynak.kenar === "ALT") {
+      const merkez = pos * genişlik;
+      ctx.fillRect(merkez - 20, yükseklik - 6, 40, 6);
+    } else if (portal.kaynak.kenar === "SAG") {
+      const merkez = pos * yükseklik;
+      ctx.fillRect(genişlik - 6, merkez - 20, 6, 40);
+    } else if (portal.kaynak.kenar === "SOL") {
+      const merkez = pos * yükseklik;
+      ctx.fillRect(0, merkez - 20, 6, 40);
+    }
+  }
+}
