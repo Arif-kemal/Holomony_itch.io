@@ -14,6 +14,7 @@ const HUCRE = {
   BOS:    0,   // geçilebilir alan
   DUVAR:  1,   // katı blok / zemin
   PORTAL: 2,   // portal işaretli hücre (görsel farklı çizilir)
+  CIKIS:3
 };
 
 // ============================================================
@@ -138,8 +139,8 @@ const oda6Matrisi = [
   [1,1,1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,1,1,1], // 7
   [0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1], // 8 (Oda 5'ten gelen SOL yol)
   [0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1], // 9 
-  [1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,1,1,1,1,1], // 10 (Alt portal boşluğu)
-  [1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,1,1,1,1,1]  // 11 
+  [1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,1,1,1,1,1], // 10
+  [3,3,1,1,1,1,0,0,0,1,1,1,1,1,1,1,1,1,1,1]  // 11 (Sol alt köşedeki iki bloğu 3 yaptık!)
 ];
 // ============================================================
 //  ODA HAVUZU
@@ -214,13 +215,79 @@ const solGecis = {
 //
 //  ŞİMDİLİK BOŞ — İçini siz dolduracaksınız.
 // ============================================================
+// ============================================================
+//  PORTAL (ÜST/ALT KENAR GEÇİŞ) SİSTEMİ - TÜM KURALLAR
+// ============================================================
+// ============================================================
+//  PORTAL (ÜST/ALT KENAR GEÇİŞ) SİSTEMİ - TÜM KURALLAR
+// ============================================================
 const portaller = [
-  // Örnek (aktif değil, yorum satırında bırakıldı):
-  // {
-  //   kaynak: { oda: 1, kenar: "UST", pozisyon: 0.5 },
-  //   hedef:  { oda: 4, kenar: "SAG", pozisyon: 0.5 },
-  //   donus: 90
-  // },
+  // ─── 1. ODA BAĞLANTILARI ───
+  {
+    kaynak: { oda: 1, kenar: "ALT", pozisyon: 0.2 }, // Oda 1'den aşağı düşersen
+    hedef:  { oda: 3, kenar: "UST", pozisyon: 0.25 }, // Oda 3'ün tavanından girersin
+    donus: 0 
+  },
+
+  // ─── 2. ODA BAĞLANTILARI ───
+  {
+    kaynak: { oda: 2, kenar: "ALT", pozisyon: 0.45 }, // Oda 2'den aşağı düşersen
+    hedef:  { oda: 5, kenar: "UST", pozisyon: 0.25 }, // Oda 5'in tavanından girersin
+    donus: 0 
+  },
+  {
+    kaynak: { oda: 2, kenar: "UST", pozisyon: 0.45 }, // Oda 2'den yukarı zıplarsan
+    hedef:  { oda: 4, kenar: "ALT", pozisyon: 0.35 }, // Oda 4'ün altından, TERS YERÇEKİMİ ile girersin
+    donus: 180 
+  },
+
+  // ─── 3. ODA BAĞLANTILARI ───
+  {
+    kaynak: { oda: 3, kenar: "UST", pozisyon: 0.25 }, // Oda 3'ten yukarı zıplarsan
+    hedef:  { oda: 1, kenar: "ALT", pozisyon: 0.2 },  // Oda 1'e geri dönersin
+    donus: 0 
+  },
+  {
+    kaynak: { oda: 3, kenar: "ALT", pozisyon: 0.6 },  // Oda 3'ün büyük boşluğundan düşersen
+    hedef:  { oda: 6, kenar: "UST", pozisyon: 0.75 }, // Oda 6'nın tavanından girersin
+    donus: 0 
+  },
+
+  // ─── 4. ODA BAĞLANTILARI ───
+  {
+    kaynak: { oda: 4, kenar: "ALT", pozisyon: 0.35 }, // Oda 4'ten aşağı düşersen
+    hedef:  { oda: 2, kenar: "UST", pozisyon: 0.45 }, // Oda 2'nin tavanından, TERS YERÇEKİMİ ile dönersin
+    donus: 180 
+  },
+  {
+    kaynak: { oda: 4, kenar: "UST", pozisyon: 0.55 }, // Oda 4'ün bacasından zıplarsan
+    hedef:  { oda: 6, kenar: "ALT", pozisyon: 0.35 }, // Oda 6'ya tersten girersin
+    donus: 180 
+  },
+
+  // ─── 5. ODA BAĞLANTILARI ───
+  {
+    kaynak: { oda: 5, kenar: "UST", pozisyon: 0.25 }, // Oda 5'ten yukarı zıplarsan
+    hedef:  { oda: 2, kenar: "ALT", pozisyon: 0.45 }, // Oda 2'nin zeminine geri dönersin
+    donus: 0 
+  },
+  {
+    kaynak: { oda: 5, kenar: "ALT", pozisyon: 0.65 }, // Oda 5'in altından düşersen
+    hedef:  { oda: 4, kenar: "UST", pozisyon: 0.55 }, // Oda 4'ün tavanından TERS YERÇEKİMİ ile girersin
+    donus: 180 
+  },
+
+  // ─── 6. ODA BAĞLANTILARI ───
+  {
+    kaynak: { oda: 6, kenar: "UST", pozisyon: 0.75 }, // Oda 6'dan yukarı zıplarsan
+    hedef:  { oda: 3, kenar: "ALT", pozisyon: 0.6 },  // Oda 3'e geri dönersin
+    donus: 0 
+  },
+  {
+    kaynak: { oda: 6, kenar: "ALT", pozisyon: 0.35 }, // Oda 6'dan aşağı düşersen
+    hedef:  { oda: 4, kenar: "UST", pozisyon: 0.55 }, // Oda 4'ün tavanından tersten girersin
+    donus: 180 
+  }
 ];
 
 // ============================================================

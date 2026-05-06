@@ -246,6 +246,19 @@ function güncelle() {
 
   // ─── Kenar geçiş kontrolü ───
   kenarGeçişKontrol();
+  const blok = pikseldenBlokAl(topumuz.x, topumuz.y);
+  if (blok && aktifMatris[blok.satır][blok.sütun] === HUCRE.CIKIS) {
+    if (oyunAktif) {
+      oyunAktif = false; // Oyunu durdur
+      sesÇal(sesHedef);  // hedef.mp3 sesini çal
+      
+      // Ses çaldıktan yarım saniye sonra ekrana uyarı ver ve sayfayı yenile
+      setTimeout(() => {
+        alert("TEBRİKLER HOCAM! PARKURU TAMAMLADIN!");
+        location.reload(); 
+      }, 500);
+    }
+  }
 }
 
 // ============================================================
@@ -649,6 +662,10 @@ function haritaÇiz() {
         grad.addColorStop(0, "rgba(255,80,120,0.5)");
         grad.addColorStop(1, "rgba(255,80,120,0)");
         ctx.fillStyle = grad;
+        ctx.fillRect(px, py, HUCRE_BOY, HUCRE_BOY);
+      }else if (değer === HUCRE.CIKIS) {
+        // Çıkış noktamız nane yeşili olsun bizde naneyi yedik zaten
+        ctx.fillStyle = "#42f554";
         ctx.fillRect(px, py, HUCRE_BOY, HUCRE_BOY);
       }
     }
