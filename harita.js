@@ -4,8 +4,8 @@
 // ============================================================
 
 // ─── Grid boyutları (oyun.js ile senkron olmalı) ───
-const SUTUN_SAYISI = 20;   // yatay hücre adedi
-const SATIR_SAYISI = 20;   // dikey hücre adedi
+const SUTUN_SAYISI = 24;   // yatay hücre adedi
+const SATIR_SAYISI = 24;   // dikey hücre adedi
 
 // ─── Hücre türü sabitleri ───
 // Sayısal değerler harita matrislerinde kullanılır.
@@ -57,10 +57,6 @@ function bosOdaOlustur() {
 // ============================================================
 
 // ─── ODA 1 ───
-// Sol üst köşede başlangıç platformu (satır 1-3, sütun 0-2 boş)
-// Orta katmanda geniş boşluk (satır 7-12, sütun 0-12)
-// Sağ geçiş koridoru: satır 14-15 → Oda 2'ye
-// Alt portal: sütun 7-12, satır 19
 const oda1Matrisi = [
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
@@ -89,10 +85,6 @@ const oda1Matrisi = [
 ];
 
 // ─── ODA 2 ───
-// Sol geçiş: satır 14-15 (Oda 1'den gelir)
-// Sağ geçiş: satır 7-12 → Oda 3'e
-// Üst portal: sütun 0-0 yok, üst açık değil
-// Alt portal: sütun 7-12, satır 19
 const oda2Matrisi = [
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
@@ -121,10 +113,6 @@ const oda2Matrisi = [
 ];
 
 // ─── ODA 3 ───
-// Sol geçiş: satır 7-12 (Oda 2'den gelir)
-// Sağ geçiş: satır 7-12 → Oda 4'e
-// Üst: kapalı
-// Alt portal: sütun 4-14, satır 19 (geniş platform boşluğu)
 const oda3Matrisi = [
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
@@ -153,10 +141,6 @@ const oda3Matrisi = [
 ];
 
 // ─── ODA 4 ───
-// Sol geçiş: satır 7-12 (Oda 3'ten gelir)
-// Sağ geçiş: satır 7-12 → Oda 5'e
-// Üst portal: sütun 0-6 (sol bölge)
-// Alt portal: sütun 13-16 (sağ bölge)
 const oda4Matrisi = [
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
@@ -185,10 +169,7 @@ const oda4Matrisi = [
 ];
 
 // ─── ODA 5 ───
-// Sol geçiş: satır 7-12 (Oda 4'ten gelir)
-// Sağ geçiş: satır 7-12 → Oda 6'ya
-// Üst portal: sütun 0-6
-// Alt portal: sütun 17-18
+
 const oda5Matrisi = [
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
@@ -217,11 +198,6 @@ const oda5Matrisi = [
 ];
 
 // ─── ODA 6 ───
-// Sol geçiş: satır 7-12 (Oda 5'ten gelir)
-// Sağ → Oda 1'e döngüsel (satır 7-12)
-// Üst portal: sütun 0-6
-// Alt portal: sütun 13-15
-// ÇIKIŞ (3): satır 19, sütun 0-2
 const oda6Matrisi = [
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
@@ -328,72 +304,93 @@ const solGecis = {
 //  PORTAL (ÜST/ALT KENAR GEÇİŞ) SİSTEMİ - TÜM KURALLAR
 // ============================================================
 const portaller = [
-  // ─── 1. ODA BAĞLANTILARI ───
+
+  // ── ODA 1 ALT → ODA 3 ÜST ──
+  // Oda 1 satır 23 boş sütunlar: 8-14 → Oda 3 satır 0 boş sütunlar: 8-15
   {
-    kaynak: { oda: 1, kenar: "ALT", pozisyon: 0.2 }, // Oda 1'den aşağı düşersen
-    hedef:  { oda: 3, kenar: "UST", pozisyon: 0.25 }, // Oda 3'ün tavanından girersin
-    donus: 0 
+    kaynak: { oda: 1, kenar: "ALT", aralik: [8, 14] },
+    hedef:  { oda: 3, kenar: "UST", hizalama: 0.46 },
+    donus: 0,
+  },
+  // Geri: Oda 3 ÜST → Oda 1 ALT
+  {
+    kaynak: { oda: 3, kenar: "UST", aralik: [8, 15] },
+    hedef:  { oda: 1, kenar: "ALT", hizalama: 0.46 },
+    donus: 0,
   },
 
-  // ─── 2. ODA BAĞLANTILARI ───
+  // ── ODA 2 ALT → ODA 5 ÜST ──
+  // Oda 2 satır 23 boş sütunlar: 8-15 → Oda 5 satır 0 boş sütunlar: 8-15
   {
-    kaynak: { oda: 2, kenar: "ALT", pozisyon: 0.45 }, // Oda 2'den aşağı düşersen
-    hedef:  { oda: 5, kenar: "UST", pozisyon: 0.25 }, // Oda 5'in tavanından girersin
-    donus: 0 
+    kaynak: { oda: 2, kenar: "ALT", aralik: [8, 15] },
+    hedef:  { oda: 5, kenar: "UST", hizalama: 0.46 },
+    donus: 0,
   },
+  // Geri: Oda 5 ÜST → Oda 2 ALT
   {
-    kaynak: { oda: 2, kenar: "UST", pozisyon: 0.45 }, // Oda 2'den yukarı zıplarsan
-    hedef:  { oda: 4, kenar: "ALT", pozisyon: 0.35 }, // Oda 4'ün altından, TERS YERÇEKİMİ ile girersin
-    donus: 180 
-  },
-
-  // ─── 3. ODA BAĞLANTILARI ───
-  {
-    kaynak: { oda: 3, kenar: "UST", pozisyon: 0.25 }, // Oda 3'ten yukarı zıplarsan
-    hedef:  { oda: 1, kenar: "ALT", pozisyon: 0.2 },  // Oda 1'e geri dönersin
-    donus: 0 
-  },
-  {
-    kaynak: { oda: 3, kenar: "ALT", pozisyon: 0.6 },  // Oda 3'ün büyük boşluğundan düşersen
-    hedef:  { oda: 6, kenar: "UST", pozisyon: 0.75 }, // Oda 6'nın tavanından girersin
-    donus: 0 
+    kaynak: { oda: 5, kenar: "UST", aralik: [8, 15] },
+    hedef:  { oda: 2, kenar: "ALT", hizalama: 0.46 },
+    donus: 0,
   },
 
-  // ─── 4. ODA BAĞLANTILARI ───
+  // ── ODA 2 ÜST → ODA 4 ALT (180°) ──
+  // Oda 2 satır 0 boş sütunlar: 8-15 → Oda 4 satır 23 boş sütunlar: 8-15
+  // 180° dönüş: oda 4 baş aşağı döner, top zemine iner
   {
-    kaynak: { oda: 4, kenar: "ALT", pozisyon: 0.35 }, // Oda 4'ten aşağı düşersen
-    hedef:  { oda: 2, kenar: "UST", pozisyon: 0.45 }, // Oda 2'nin tavanından, TERS YERÇEKİMİ ile dönersin
-    donus: 180 
+    kaynak: { oda: 2, kenar: "UST", aralik: [8, 15] },
+    hedef:  { oda: 4, kenar: "ALT", hizalama: 0.46 },
+    donus: 180,
   },
+  // Geri: Oda 4 ALT → Oda 2 ÜST (180° geri alır)
   {
-    kaynak: { oda: 4, kenar: "UST", pozisyon: 0.55 }, // Oda 4'ün bacasından zıplarsan
-    hedef:  { oda: 6, kenar: "ALT", pozisyon: 0.35 }, // Oda 6'ya tersten girersin
-    donus: 180 
-  },
-
-  // ─── 5. ODA BAĞLANTILARI ───
-  {
-    kaynak: { oda: 5, kenar: "UST", pozisyon: 0.25 }, // Oda 5'ten yukarı zıplarsan
-    hedef:  { oda: 2, kenar: "ALT", pozisyon: 0.45 }, // Oda 2'nin zeminine geri dönersin
-    donus: 0 
-  },
-  {
-    kaynak: { oda: 5, kenar: "ALT", pozisyon: 0.65 }, // Oda 5'in altından düşersen
-    hedef:  { oda: 4, kenar: "UST", pozisyon: 0.55 }, // Oda 4'ün tavanından TERS YERÇEKİMİ ile girersin
-    donus: 180 
+    kaynak: { oda: 4, kenar: "ALT", aralik: [8, 15] },
+    hedef:  { oda: 2, kenar: "UST", hizalama: 0.46 },
+    donus: 180,
   },
 
-  // ─── 6. ODA BAĞLANTILARI ───
+  // ── ODA 3 ALT → ODA 6 ÜST ──
+  // Oda 3 satır 23 boş sütunlar: 6-8 ve 17-18
+  // İki ayrı portal deliği var, ikisini de tanımlıyoruz
   {
-    kaynak: { oda: 6, kenar: "UST", pozisyon: 0.75 }, // Oda 6'dan yukarı zıplarsan
-    hedef:  { oda: 3, kenar: "ALT", pozisyon: 0.6 },  // Oda 3'e geri dönersin
-    donus: 0 
+    kaynak: { oda: 3, kenar: "ALT", aralik: [6, 8] },
+    hedef:  { oda: 6, kenar: "UST", hizalama: 0.46 },
+    donus: 0,
   },
   {
-    kaynak: { oda: 6, kenar: "ALT", pozisyon: 0.35 }, // Oda 6'dan aşağı düşersen
-    hedef:  { oda: 4, kenar: "UST", pozisyon: 0.55 }, // Oda 4'ün tavanından tersten girersin
-    donus: 180 
-  }
+    kaynak: { oda: 3, kenar: "ALT", aralik: [17, 18] },
+    hedef:  { oda: 6, kenar: "UST", hizalama: 0.75 },
+    donus: 0,
+  },
+  // Geri: Oda 6 ÜST → Oda 3 ALT
+  {
+    kaynak: { oda: 6, kenar: "UST", aralik: [8, 15] },
+    hedef:  { oda: 3, kenar: "ALT", hizalama: 0.46 },
+    donus: 0,
+  },
+
+  // ── ODA 4 ÜST → ODA 6 ALT (180°) ──
+  // Oda 4 satır 0 boş sütunlar: 8-15 → Oda 6 alt bölgesine ters giriş
+  // 180°: oda 6 baş aşağı döner, 3'lü çıkış hücreleri zemine gelir!
+  {
+    kaynak: { oda: 4, kenar: "UST", aralik: [8, 15] },
+    hedef:  { oda: 6, kenar: "ALT", hizalama: 0.46 },
+    donus: 180,
+  },
+  // Geri: Oda 6 ALT → Oda 4 ÜST
+  {
+    kaynak: { oda: 6, kenar: "ALT", aralik: [8, 15] },
+    hedef:  { oda: 4, kenar: "UST", hizalama: 0.46 },
+    donus: 180,
+  },
+
+  // ── ODA 5 ALT → ODA 4 ÜST (180°) ──
+  // Oda 5 satır 23 boş sütunlar: 8-15
+  {
+    kaynak: { oda: 5, kenar: "ALT", aralik: [8, 15] },
+    hedef:  { oda: 4, kenar: "UST", hizalama: 0.46 },
+    donus: 180,
+  },
+
 ];
 
 // ============================================================
@@ -474,18 +471,21 @@ function matrisDondur(matris, aci) {
  * @param {number} tolerans  Pozisyon eşleşme toleransı (varsayılan 0.15)
  * @returns {object|null}    Portal nesnesi ya da null
  */
-function portalBul(odaNo, kenar, pozisyon, tolerans = 0.15) {
-  for (const portal of portaller) {
-    const k = portal.kaynak;
-    if (
-      k.oda    === odaNo &&
-      k.kenar  === kenar &&
-      Math.abs(k.pozisyon - pozisyon) <= tolerans
-    ) {
-      return portal;
+function portalBul(odaNo, kenar, piksel, kanal) {
+  // piksel: topun kenar üzerindeki x veya y piksel pozisyonu
+  // kanal: o eksenin toplam piksel uzunluğu (canvas genişliği veya yüksekliği)
+  // hücre indeksine çeviriyoruz
+  const hucrePos = (piksel / kanal) * SUTUN_SAYISI;
+
+  for (const p of portaller) {
+    if (p.kaynak.oda !== odaNo) continue;
+    if (p.kaynak.kenar !== kenar) continue;
+    const [bas, son] = p.kaynak.aralik;
+    if (hucrePos >= bas - 0.5 && hucrePos <= son + 0.5) {
+      return p;
     }
   }
-  return null; // eşleşen portal yok
+  return null;
 }
 
 /**

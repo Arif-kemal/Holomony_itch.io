@@ -387,7 +387,8 @@ function kenarGeçişKontrol() {
   if (topumuz.x - r > genişlik) {
     // Önce portal var mı bak
     const normPozisyon = topumuz.y / yükseklik;
-    const portal = portalBul(mevcutOda, "SAG", normPozisyon);
+    // SAĞ kenarda:
+const portal = portalBul(mevcutOda, "SAG", topumuz.y, matrisSatir * HUCRE_BOY);
     if (portal) {
       portalGeçişYap(portal);
     } else {
@@ -401,7 +402,8 @@ function kenarGeçişKontrol() {
   // ── SOL KENAR ──
   if (topumuz.x + r < 0) {
     const normPozisyon = topumuz.y / yükseklik;
-    const portal = portalBul(mevcutOda, "SOL", normPozisyon);
+    // SOL kenarda:
+const portal = portalBul(mevcutOda, "SOL", topumuz.y, matrisSatir * HUCRE_BOY);
     if (portal) {
       portalGeçişYap(portal);
     } else {
@@ -414,7 +416,8 @@ function kenarGeçişKontrol() {
   // ── ÜST KENAR ──
   if (topumuz.y + r < 0) {
     const normPozisyon = topumuz.x / genişlik;
-    const portal = portalBul(mevcutOda, "UST", normPozisyon);
+    // ÜST kenarda:
+const portal = portalBul(mevcutOda, "UST", topumuz.x, matrisSutun * HUCRE_BOY);
     if (portal) {
       portalGeçişYap(portal);
     } else {
@@ -428,7 +431,8 @@ function kenarGeçişKontrol() {
   // ── ALT KENAR ──
   if (topumuz.y - r > yükseklik) {
     const normPozisyon = topumuz.x / genişlik;
-    const portal = portalBul(mevcutOda, "ALT", normPozisyon);
+    // ALT kenarda:
+const portal = portalBul(mevcutOda, "ALT", topumuz.x, matrisSutun * HUCRE_BOY);
     if (portal) {
       portalGeçişYap(portal);
     } else {
@@ -506,28 +510,28 @@ function portalGeçişYap(portal) {
 
   // Topu hedef kenar ve pozisyona yerleştir
   switch (hedef.kenar) {
-    case "SOL":
-      topumuz.x = r + 2;
-      topumuz.y = hedef.pozisyon * yükseklik;
-      topumuz.hizX = Math.abs(topumuz.hizX) + 2;   // içe doğru momentum
-      break;
-    case "SAG":
-      topumuz.x = genişlik - r - 2;
-      topumuz.y = hedef.pozisyon * yükseklik;
-      topumuz.hizX = -(Math.abs(topumuz.hizX) + 2);
-      break;
-    case "UST":
-      topumuz.x = hedef.pozisyon * genişlik;
-      topumuz.y = r + 2;
-      topumuz.hizY = Math.abs(topumuz.hizY) * 0.5;
-      break;
-    case "ALT":
-      topumuz.x = hedef.pozisyon * genişlik;
-      topumuz.y = yükseklik - r - 2;
-      topumuz.hizY = 0;
-      topumuz.yerde = true;
-      break;
-  }
+  case "SOL":
+    topumuz.x = r + 2;
+    topumuz.y = hedef.hizalama * (matrisSatir * HUCRE_BOY);
+    topumuz.hizX = Math.abs(topumuz.hizX) + 2;
+    break;
+  case "SAG":
+    topumuz.x = (matrisSutun * HUCRE_BOY) - r - 2;
+    topumuz.y = hedef.hizalama * (matrisSatir * HUCRE_BOY);
+    topumuz.hizX = -(Math.abs(topumuz.hizX) + 2);
+    break;
+  case "UST":
+    topumuz.x = hedef.hizalama * (matrisSutun * HUCRE_BOY);
+    topumuz.y = r + 2;
+    topumuz.hizY = 2;
+    break;
+  case "ALT":
+    topumuz.x = hedef.hizalama * (matrisSutun * HUCRE_BOY);
+    topumuz.y = (matrisSatir * HUCRE_BOY) - r - 2;
+    topumuz.hizY = 0;
+    topumuz.yerde = true;
+    break;
+}
 
   // Sınır içinde tut
   topumuz.x = Math.max(r + 2, Math.min(topumuz.x, genişlik - r - 2));
@@ -535,7 +539,7 @@ function portalGeçişYap(portal) {
 
   // Geçiş animasyonu
   geçişAnim.aktif  = true;
-  geçişAnim.sayaç  = 0;
+  geçişAnim.sayaç  = 0; 
   geçişAnim.yön    = "portal";
 
   // HUD güncelle
@@ -546,15 +550,20 @@ function portalGeçişYap(portal) {
 //  TOPU SIFIRLA — Başlangıç pozisyonuna yerleştir
 // ============================================================
 function topuSıfırla() {
-  const genişlik  = matrisSutun * HUCRE_BOY;
-  const yükseklik = matrisSatir * HUCRE_BOY;
-
-  // Başlangıç: yatayda orta, dikeyde zemine yakın
-  topumuz.x     = HUCRE_BOY*1,5;
-  topumuz.y     = HUCRE_BOY*17,5;
-  topumuz.hizX  = 0;
-  topumuz.hizY  = 0;
+   // Oda 3, satır 10, sütun 12 → HUCRE.PORTAL (2) konumu
+  // piksel = hücre_no × HUCRE_BOY + yarım hücre
+  topumuz.x    = 12 * HUCRE_BOY + HUCRE_BOY / 2;
+  topumuz.y    = 10 * HUCRE_BOY + HUCRE_BOY / 2;
+  topumuz.hizX = 0;
+  topumuz.hizY = 0;
   topumuz.yerde = false;
+
+  // Başlangıç odası Oda 3
+  mevcutOda   = 3;
+  haritaDönüş = 0;
+  aktifMatris = matrisDondur(odaMatrisiAl(mevcutOda), haritaDönüş);
+  kanvasYenidenBoyutla();
+  hudGüncelle();
 }
 
 // ============================================================
@@ -724,24 +733,24 @@ function kenarGöstergeÇiz(genişlik, yükseklik) {
 
   // Portaller için üst/alt kenar göstergesi
   for (const portal of portaller) {
-    if (portal.kaynak.oda !== mevcutOda) continue;
+  if (portal.kaynak.oda !== mevcutOda) continue;
+  const [bas, son] = portal.kaynak.aralik;
+  // aralığın ortasını al
+  const ortaHucre = (bas + son) / 2;
+  ctx.fillStyle = RENKLER.portal;
 
-    const pos = portal.kaynak.pozisyon;
-
-    ctx.fillStyle = RENKLER.portal;
-
-    if (portal.kaynak.kenar === "UST") {
-      const merkez = pos * genişlik;
-      ctx.fillRect(merkez - 20, 0, 40, 6);
-    } else if (portal.kaynak.kenar === "ALT") {
-      const merkez = pos * genişlik;
-      ctx.fillRect(merkez - 20, yükseklik - 6, 40, 6);
-    } else if (portal.kaynak.kenar === "SAG") {
-      const merkez = pos * yükseklik;
-      ctx.fillRect(genişlik - 6, merkez - 20, 6, 40);
-    } else if (portal.kaynak.kenar === "SOL") {
-      const merkez = pos * yükseklik;
-      ctx.fillRect(0, merkez - 20, 6, 40);
-    }
+  if (portal.kaynak.kenar === "UST") {
+    const merkez = (ortaHucre / SUTUN_SAYISI) * genişlik;
+    ctx.fillRect(merkez - 20, 0, 40, 6);
+  } else if (portal.kaynak.kenar === "ALT") {
+    const merkez = (ortaHucre / SUTUN_SAYISI) * genişlik;
+    ctx.fillRect(merkez - 20, yükseklik - 6, 40, 6);
+  } else if (portal.kaynak.kenar === "SAG") {
+    const merkez = (ortaHucre / SATIR_SAYISI) * yükseklik;
+    ctx.fillRect(genişlik - 6, merkez - 20, 6, 40);
+  } else if (portal.kaynak.kenar === "SOL") {
+    const merkez = (ortaHucre / SATIR_SAYISI) * yükseklik;
+    ctx.fillRect(0, merkez - 20, 6, 40);
   }
+}
 }
