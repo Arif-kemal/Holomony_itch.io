@@ -550,8 +550,8 @@ function topuSıfırla() {
   const yükseklik = matrisSatir * HUCRE_BOY;
 
   // Başlangıç: yatayda orta, dikeyde zemine yakın
-  topumuz.x     = genişlik  * 0.15;
-  topumuz.y     = yükseklik - HUCRE_BOY * 2;
+  topumuz.x     = HUCRE_BOY*1,5;
+  topumuz.y     = HUCRE_BOY*17,5;
   topumuz.hizX  = 0;
   topumuz.hizY  = 0;
   topumuz.yerde = false;
