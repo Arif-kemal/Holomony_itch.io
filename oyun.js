@@ -11,7 +11,7 @@ const ctx     = kanvas.getContext("2d");
 // ============================================================
 //  SABITLER
 // ============================================================
-const HUCRE_BOY       = 40;      // her grid hücresinin piksel boyutu
+const HUCRE_BOY       = 28;      // her grid hücresinin piksel boyutu
 const YERÇEKIMI       = 0.55;    // kare başına hız artışı (piksel/kare²)
 const MAX_DÜŞÜŞ_HIZI  = 14;      // aşağı düşüş hız sınırı
 const HAREKET_HIZI    = 3.8;     // yatay hareket hızı (piksel/kare)
