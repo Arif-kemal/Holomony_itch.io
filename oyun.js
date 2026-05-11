@@ -550,20 +550,20 @@ function portalGeçişYap(portal) {
 //  TOPU SIFIRLA — Başlangıç pozisyonuna yerleştir
 // ============================================================
 function topuSıfırla() {
-   // Oda 3, satır 10, sütun 12 → HUCRE.PORTAL (2) konumu
-  // piksel = hücre_no × HUCRE_BOY + yarım hücre
+  mevcutOda   = 1;
+  haritaDönüş = 0;
+  aktifMatris = matrisDondur(odaMatrisiAl(1), 0);
+  kanvasYenidenBoyutla();
   topumuz.x    = 12 * HUCRE_BOY + HUCRE_BOY / 2;
   topumuz.y    = 10 * HUCRE_BOY + HUCRE_BOY / 2;
   topumuz.hizX = 0;
   topumuz.hizY = 0;
   topumuz.yerde = false;
-
-  // Başlangıç odası Oda 3
-  mevcutOda   = 3;
-  haritaDönüş = 0;
   aktifMatris = matrisDondur(odaMatrisiAl(mevcutOda), haritaDönüş);
   kanvasYenidenBoyutla();
   hudGüncelle();
+   // Oda 3, satır 10, sütun 12 → HUCRE.PORTAL (2) konumu
+  // piksel = hücre_no × HUCRE_BOY + yarım hücre
 }
 
 // ============================================================
