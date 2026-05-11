@@ -142,21 +142,21 @@ const oda3Matrisi = [
 
 // ─── ODA 4 ───
 const oda4Matrisi = [
-  [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
+  [1,0,0,0,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,1],
+  [0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,0,0,0,0],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
-  [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
-  [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+  [0,0,0,0,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,1,0,0,0,0],
+  [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1],
+  [1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,1,1],
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1],
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1],
-  [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1],
-  [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1],
+  [1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0],
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [1,1,1,1,1,1,1,1,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0],
+  [1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
   [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
@@ -265,7 +265,7 @@ const solGecis = {
   3: { hedefOda: 2, donus: 0 },
   4: { hedefOda: 3, donus: 0 },
   5: { hedefOda: 4, donus: 0 },
-  6: { hedefOda: 5, donus: 0 },
+  6: { hedefOda: 1, donus: 0 },
 };
 
 // ============================================================
@@ -305,90 +305,96 @@ const solGecis = {
 // ============================================================
 const portaller = [
 
-  // ── ODA 1 ALT → ODA 3 ÜST ──
-  // Oda 1 satır 23 boş sütunlar: 8-14 → Oda 3 satır 0 boş sütunlar: 8-15
+  // --- ODA 1 ---
   {
-    kaynak: { oda: 1, kenar: "ALT", aralik: [8, 14] },
-    hedef:  { oda: 3, kenar: "UST", hizalama: 0.46 },
+    kaynak: { oda: 1, kenar: "UST", aralik: [8, 15] },
+    hedef:  { oda: 4, kenar: "UST", hizalama: 0.5 },
+    donus: 180,
+  },
+  {
+    kaynak: { oda: 1, kenar: "ALT", aralik: [8, 15] },
+    hedef:  { oda: 2, kenar: "UST", hizalama: 0.5 },
     donus: 0,
   },
-  // Geri: Oda 3 ÜST → Oda 1 ALT
   {
-    kaynak: { oda: 3, kenar: "UST", aralik: [8, 15] },
-    hedef:  { oda: 1, kenar: "ALT", hizalama: 0.46 },
-    donus: 0,
+    kaynak: { oda: 1, kenar: "SOL", aralik: [8, 15] },
+    hedef:  { oda: 5, kenar: "UST", hizalama: 0.5 },
+    donus: 270,
   },
-
-  // ── ODA 2 ALT → ODA 5 ÜST ──
-  // Oda 2 satır 23 boş sütunlar: 8-15 → Oda 5 satır 0 boş sütunlar: 8-15
   {
-    kaynak: { oda: 2, kenar: "ALT", aralik: [8, 15] },
-    hedef:  { oda: 5, kenar: "UST", hizalama: 0.46 },
-    donus: 0,
-  },
-  // Geri: Oda 5 ÜST → Oda 2 ALT
-  {
-    kaynak: { oda: 5, kenar: "UST", aralik: [8, 15] },
-    hedef:  { oda: 2, kenar: "ALT", hizalama: 0.46 },
-    donus: 0,
+    kaynak: { oda: 1, kenar: "SAG", aralik: [8, 15] },
+    hedef:  { oda: 3, kenar: "UST", hizalama: 0.5 },
+    donus: 90,
   },
 
-  // ── ODA 2 ÜST → ODA 4 ALT (180°) ──
-  // Oda 2 satır 0 boş sütunlar: 8-15 → Oda 4 satır 23 boş sütunlar: 8-15
-  // 180° dönüş: oda 4 baş aşağı döner, top zemine iner
+  // --- ODA 2 ---
   {
     kaynak: { oda: 2, kenar: "UST", aralik: [8, 15] },
-    hedef:  { oda: 4, kenar: "ALT", hizalama: 0.46 },
-    donus: 180,
-  },
-  // Geri: Oda 4 ALT → Oda 2 ÜST (180° geri alır)
-  {
-    kaynak: { oda: 4, kenar: "ALT", aralik: [8, 15] },
-    hedef:  { oda: 2, kenar: "UST", hizalama: 0.46 },
-    donus: 180,
-  },
-
-  // ── ODA 3 ALT → ODA 6 ÜST ──
-  // Oda 3 satır 23 boş sütunlar: 6-8 ve 17-18
-  // İki ayrı portal deliği var, ikisini de tanımlıyoruz
-  {
-    kaynak: { oda: 3, kenar: "ALT", aralik: [6, 8] },
-    hedef:  { oda: 6, kenar: "UST", hizalama: 0.46 },
+    hedef:  { oda: 1, kenar: "ALT", hizalama: 0.5 },
     donus: 0,
   },
   {
-    kaynak: { oda: 3, kenar: "ALT", aralik: [17, 18] },
-    hedef:  { oda: 6, kenar: "UST", hizalama: 0.75 },
-    donus: 0,
-  },
-  // Geri: Oda 6 ÜST → Oda 3 ALT
-  {
-    kaynak: { oda: 6, kenar: "UST", aralik: [8, 15] },
-    hedef:  { oda: 3, kenar: "ALT", hizalama: 0.46 },
+    kaynak: { oda: 2, kenar: "ALT", aralik: [8, 15] },
+    hedef:  { oda: 6, kenar: "UST", hizalama: 0.5 },
     donus: 0,
   },
 
-  // ── ODA 4 ÜST → ODA 6 ALT (180°) ──
-  // Oda 4 satır 0 boş sütunlar: 8-15 → Oda 6 alt bölgesine ters giriş
-  // 180°: oda 6 baş aşağı döner, 3'lü çıkış hücreleri zemine gelir!
+  // --- ODA 3 ---
+  {
+    kaynak: { oda: 3, kenar: "UST", aralik: [8, 15] },
+    hedef:  { oda: 1, kenar: "SAG", hizalama: 0.5 },
+    donus: 270,
+  },
+  {
+    kaynak: { oda: 3, kenar: "ALT", aralik: [8, 15] },
+    hedef:  { oda: 6, kenar: "SAG", hizalama: 0.5 },
+    donus: 90,
+  },
+
+  // --- ODA 4 ---
   {
     kaynak: { oda: 4, kenar: "UST", aralik: [8, 15] },
-    hedef:  { oda: 6, kenar: "ALT", hizalama: 0.46 },
+    hedef:  { oda: 1, kenar: "UST", hizalama: 0.5 },
     donus: 180,
   },
-  // Geri: Oda 6 ALT → Oda 4 ÜST
   {
-    kaynak: { oda: 6, kenar: "ALT", aralik: [8, 15] },
-    hedef:  { oda: 4, kenar: "UST", hizalama: 0.46 },
+    kaynak: { oda: 4, kenar: "ALT", aralik: [8, 15] },
+    hedef:  { oda: 6, kenar: "ALT", hizalama: 0.5 },
     donus: 180,
   },
 
-  // ── ODA 5 ALT → ODA 4 ÜST (180°) ──
-  // Oda 5 satır 23 boş sütunlar: 8-15
+  // --- ODA 5 ---
+  {
+    kaynak: { oda: 5, kenar: "UST", aralik: [8, 15] },
+    hedef:  { oda: 1, kenar: "SOL", hizalama: 0.5 },
+    donus: 90,
+  },
   {
     kaynak: { oda: 5, kenar: "ALT", aralik: [8, 15] },
-    hedef:  { oda: 4, kenar: "UST", hizalama: 0.46 },
+    hedef:  { oda: 6, kenar: "SOL", hizalama: 0.5 },
+    donus: 270,
+  },
+
+  // --- ODA 6 ---
+  {
+    kaynak: { oda: 6, kenar: "UST", aralik: [8, 15] },
+    hedef:  { oda: 2, kenar: "ALT", hizalama: 0.5 },
+    donus: 0,
+  },
+  {
+    kaynak: { oda: 6, kenar: "ALT", aralik: [8, 15] },
+    hedef:  { oda: 4, kenar: "ALT", hizalama: 0.5 },
     donus: 180,
+  },
+  {
+    kaynak: { oda: 6, kenar: "SOL", aralik: [8, 15] },
+    hedef:  { oda: 5, kenar: "ALT", hizalama: 0.5 },
+    donus: 90,
+  },
+  {
+    kaynak: { oda: 6, kenar: "SAG", aralik: [8, 15] },
+    hedef:  { oda: 3, kenar: "ALT", hizalama: 0.5 },
+    donus: 270,
   },
 
 ];
