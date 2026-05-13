@@ -74,7 +74,7 @@ Bu projeyi cihazınızda çalıştırmak veya doğrudan tarayıcı üzerinden oy
 
 ### Canlı Demo 
 Oyunu bilgisayarınıza indirmeden, doğrudan tarayıcınız üzerinden oynamak için aşağıdaki bağlantıya tıklayabilirsiniz:
-👉 **[Oyunun Canlı GitHub Pages / itch.io Linki Buraya Gelecek]**
+👉 **[https://arif-kemal.github.io/Holomony_itch.io/]**
 
 ### Yerel Kurulum(Gereksinimler ve Yükleme)
 Proje tamamen istemci tarafında  çalışmaktadır. Herhangi bir sunucu veya paket yükleyicisine (npm, Node.js vb.) ihtiyacınız yoktur sadece düşünmeye ihtiyacınız var.
