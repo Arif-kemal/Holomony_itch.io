@@ -5,6 +5,7 @@
 // ============================================================
 
 // ─── Canvas ve 2D bağlam ───
+let gecisKilidi = false;
 const kanvas  = document.getElementById("oyunCanvas");
 const ctx     = kanvas.getContext("2d");
 
@@ -247,18 +248,90 @@ function güncelle() {
   // ─── Kenar geçiş kontrolü ───
   kenarGeçişKontrol();
   const blok = pikseldenBlokAl(topumuz.x, topumuz.y);
-  if (blok && aktifMatris[blok.satır][blok.sütun] === HUCRE.CIKIS) {
+if (blok) {
+  const deger = aktifMatris[blok.satır][blok.sütun];
+
+  // Çıkış
+  if (deger === HUCRE.CIKIS) {
     if (oyunAktif) {
-      oyunAktif = false; // Oyunu durdur
-      sesÇal(sesHedef);  // hedef.mp3 sesini çal
-      
-      // Ses çaldıktan yarım saniye sonra ekrana uyarı ver ve sayfayı yenile
+      oyunAktif = false;
+      sesÇal(sesHedef);
       setTimeout(() => {
         alert("TEBRİKLER HOCAM! PARKURU TAMAMLADIN!");
-        location.reload(); 
+        location.reload();
       }, 500);
     }
   }
+
+  // 5 → oda1b'ye geçiş tetikleyicisi
+  if (deger === HUCRE.GECIS5 && !gecisKilidi) {
+  gecisKilidi = true;
+  döngüselGeçişYap(7, 0, mevcutOda === 1 ? "sol" : "sağ");
+  topumuz.yerde = false;
+  geçişAnim.aktif = false;
+  geçişAnim.sayaç = 0;
+  setTimeout(() => { gecisKilidi = false; }, 500);
+}
+// 9 → oda1c spawn noktası (sağ alt)
+// güncelle() fonksiyonunun dışında, üst kısımda tanımla:
+/*if (deger === 9 && !gecisKilidi) {
+  gecisKilidi = true;
+  sesÇal(sesGeçiş);
+  mevcutOda   = 13;
+  haritaDönüş = 0;
+  aktifMatris = matrisDondur(odaMatrisiAl(13), 0);
+  kanvasYenidenBoyutla();
+  topumuz.x    = 22 * HUCRE_BOY + HUCRE_BOY / 2;
+  topumuz.y    = 22 * HUCRE_BOY + HUCRE_BOY / 2;
+  topumuz.hizX = 0;
+  topumuz.hizY = 0;
+  topumuz.yerde = false;
+  geçişAnim.aktif = false;
+  geçişAnim.sayaç = 0;
+  hudGüncelle();
+  setTimeout(() => { gecisKilidi = false; }, 500);
+}*/// bu kodu yazan adam kör oldu
+  // 6 → oda1b spawn noktası (sadece görsel, geçiş yok)
+  // spawn portallar üzerinden zaten geliyor
+
+  // 8 → başa döndür (oda4b'deki tuzak)
+  if (deger === HUCRE.GECIS8 && !gecisKilidi) {
+  gecisKilidi = true;
+  sesÇal(sesGeçiş);
+  mevcutOda   = 7;
+  haritaDönüş = 0;
+  aktifMatris = matrisDondur(odaMatrisiAl(7), 0);
+  kanvasYenidenBoyutla();
+  topumuz.x    = 22 * HUCRE_BOY + HUCRE_BOY / 2;
+  topumuz.y    = 2  * HUCRE_BOY + HUCRE_BOY / 2;
+  topumuz.hizX = 0;
+  topumuz.hizY = 0;
+  topumuz.yerde = false;
+  geçişAnim.aktif = false;
+  geçişAnim.sayaç = 0;
+  hudGüncelle();
+  setTimeout(() => { gecisKilidi = false; }, 500);
+}
+
+  // 11 → oda1c spawn noktası
+  if (deger === HUCRE.GECIS11 && !gecisKilidi) {
+  gecisKilidi = true;
+  sesÇal(sesGeçiş);
+  mevcutOda   = 13;
+  haritaDönüş = 0;
+  aktifMatris = matrisDondur(odaMatrisiAl(13), 0);
+  kanvasYenidenBoyutla();
+  topumuz.x    = 22 * HUCRE_BOY + HUCRE_BOY / 2;
+  topumuz.y    = 22 * HUCRE_BOY + HUCRE_BOY / 2;
+  topumuz.hizX = 0;
+  topumuz.hizY = 0;
+  topumuz.yerde = false;
+  geçişAnim.aktif = false;
+  geçişAnim.sayaç = 0;
+  hudGüncelle();
+  setTimeout(() => { gecisKilidi = false; }, 500);
+}
+}
 }
 
 // ============================================================
@@ -371,6 +444,7 @@ function katıMı(satır, sütun) {
   if (sütun < 0 || sütun >= matrisSutun) return false;
   const değer = aktifMatris[satır][sütun];
   return değer === HUCRE.DUVAR || değer === HUCRE.PORTAL;
+  // 11 geçilebilir kalır, sadece dokunca tetiklenir
 }
 
 // ============================================================
@@ -384,34 +458,30 @@ function kenarGeçişKontrol() {
   const r         = topumuz.yariçap;
 
   // ── SAĞ KENAR ──
-  if (topumuz.x - r > genişlik) {
-    // Önce portal var mı bak
-    const normPozisyon = topumuz.y / yükseklik;
-    // SAĞ kenarda:
-const portal = portalBul(mevcutOda, "SAG", topumuz.y, matrisSatir * HUCRE_BOY);
-    if (portal) {
-      portalGeçişYap(portal);
-    } else {
-      // Yoksa sağ-sol döngüsel geçiş
-      const geçiş = sagGecisAl(mevcutOda);
-      döngüselGeçişYap(geçiş.hedefOda, geçiş.donus, "sağ");
-    }
-    return;
+if (topumuz.x - r > genişlik) {
+  const portal = portalBul(mevcutOda, "SAG", topumuz.y, matrisSatir * HUCRE_BOY);
+  if (portal) {
+    portalGeçişYap(portal);
+  } else {
+    const geçiş = sagGecisAl(mevcutOda);
+    if (geçiş) döngüselGeçişYap(geçiş.hedefOda, geçiş.donus, "sağ");
+    else { topumuz.x = genişlik - r - 1; topumuz.hizX = 0; }
   }
+  return;
+}
 
-  // ── SOL KENAR ──
-  if (topumuz.x + r < 0) {
-    const normPozisyon = topumuz.y / yükseklik;
-    // SOL kenarda:
-const portal = portalBul(mevcutOda, "SOL", topumuz.y, matrisSatir * HUCRE_BOY);
-    if (portal) {
-      portalGeçişYap(portal);
-    } else {
-      const geçiş = solGecisAl(mevcutOda);
-      döngüselGeçişYap(geçiş.hedefOda, geçiş.donus, "sol");
-    }
-    return;
+// ── SOL KENAR ──
+if (topumuz.x + r < 0) {
+  const portal = portalBul(mevcutOda, "SOL", topumuz.y, matrisSatir * HUCRE_BOY);
+  if (portal) {
+    portalGeçişYap(portal);
+  } else {
+    const geçiş = solGecisAl(mevcutOda);
+    if (geçiş) döngüselGeçişYap(geçiş.hedefOda, geçiş.donus, "sol");
+    else { topumuz.x = r + 1; topumuz.hizX = 0; }
   }
+  return;
+}
 
   // ── ÜST KENAR ──
   if (topumuz.y + r < 0) {
@@ -521,10 +591,10 @@ function portalGeçişYap(portal) {
     topumuz.hizX = -(Math.abs(topumuz.hizX) + 2);
     break;
   case "UST":
-    topumuz.x = hedef.hizalama * (matrisSutun * HUCRE_BOY);
-    topumuz.y = r + 2;
-    topumuz.hizY = 2;
-    break;
+  topumuz.x = hedef.hizalama * (matrisSutun * HUCRE_BOY);
+  topumuz.y = r + 2;
+  topumuz.hizY = 2;
+  break;
   case "ALT":
     topumuz.x = hedef.hizalama * (matrisSutun * HUCRE_BOY);
     topumuz.y = (matrisSatir * HUCRE_BOY) - r - 2;
