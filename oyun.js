@@ -30,7 +30,6 @@ const SQUISH_GERİ     = 0.18;    // geri yaylanma hızı
 // Renk paleti (CSS değişkenleriyle uyumlu)
 const RENKLER = {
   arkaplan:   "#0a0a14",
-  duvar:      "#3a3a6a",
   duvarKenar: "#5a5a9a",
   portal:     "#ff4466",
   portalPark: "rgba(255,68,102,0.18)",
@@ -38,7 +37,35 @@ const RENKLER = {
   topParıltı: "#fff9a0",
   topGölge:   "#c4a800",
   grid:       "rgba(255,255,255,0.03)",
-  geçiş:      "rgba(120,100,255,0.12)",
+
+  // Oda renk grupları — duvar dolgusu ve kenar vurgusu
+  odaRenkleri: {
+    // Kırmızı grup: oda 1, 7(1b), 13(1c)
+    1:  { duvar: "#6b2d2d", kenar: "#a04040" },
+    7:  { duvar: "#6b2d2d", kenar: "#a04040" },
+    13: { duvar: "#6b2d2d", kenar: "#a04040" },
+    // Mavi grup: oda 2, 12(6b), 19(7c), 17(5c)
+    2:  { duvar: "#2d3f6b", kenar: "#4060a0" },
+    12: { duvar: "#2d3f6b", kenar: "#4060a0" },
+    19: { duvar: "#2d3f6b", kenar: "#4060a0" },
+    17: { duvar: "#2d3f6b", kenar: "#4060a0" },
+    // Yeşil grup: oda 3, 11(5b), 14(2c)
+    3:  { duvar: "#2d5c35", kenar: "#3d8a48" },
+    11: { duvar: "#2d5c35", kenar: "#3d8a48" },
+    14: { duvar: "#2d5c35", kenar: "#3d8a48" },
+    // Sarı grup: oda 4, 10(4b), 15(3c)
+    4:  { duvar: "#5c4f1a", kenar: "#8a7528" },
+    10: { duvar: "#5c4f1a", kenar: "#8a7528" },
+    15: { duvar: "#5c4f1a", kenar: "#8a7528" },
+    // Mor grup: oda 5, 9(3b), 16(4c)
+    5:  { duvar: "#3d2d6b", kenar: "#5a40a0" },
+    9:  { duvar: "#3d2d6b", kenar: "#5a40a0" },
+    16: { duvar: "#3d2d6b", kenar: "#5a40a0" },
+    // Turuncu grup: oda 6, 8(2b), 18(6c)
+    6:  { duvar: "#6b3d1a", kenar: "#a05828" },
+    8:  { duvar: "#6b3d1a", kenar: "#a05828" },
+    18: { duvar: "#6b3d1a", kenar: "#a05828" },
+  },
 };
 
 // ============================================================
@@ -90,10 +117,12 @@ let oyunAktif = false;
 
 // ─── Geçiş animasyonu durumu ───
 const geçişAnim = {
-  aktif:    false,
-  süre:     18,      // kare sayısı
-  sayaç:    0,
-  yön:      "sağ",   // "sağ" | "sol" | "portal"
+  aktif:      false,
+  süre:       20,
+  sayaç:      0,
+  yön:        "sağ",
+  eskiMatris: null,   // önceki odanın matrisi
+  eskiOda:    1,      // önceki oda numarası
 };
 
 // ─── requestAnimationFrame handle'ı ───
@@ -523,6 +552,10 @@ function döngüselGeçişYap(hedefOda, dönüş, yön) {
   // Ses çal
   sesÇal(sesGeçiş);
 
+  // Geçiş animasyonu için eski durumu kaydet
+  geçişAnim.eskiMatris = aktifMatris.map(s => [...s]);
+  geçişAnim.eskiOda    = mevcutOda;
+
   // Oda ve dönüşü güncelle
   mevcutOda   = hedefOda;
   haritaDönüş = dönüş;
@@ -547,6 +580,9 @@ function döngüselGeçişYap(hedefOda, dönüş, yön) {
   // Y pozisyonu korunur (aynı yükseklikte giriş)
   topumuz.y = Math.max(r + 2, Math.min(topumuz.y, yükseklik - r - 2));
 
+ geçişAnim.dikey = false;
+geçişAnim.aktif = true;
+geçişAnim.sayaç = 0;
   // Geçiş animasyonunu başlat
   geçişAnim.aktif  = true;
   geçişAnim.sayaç  = 0;
@@ -563,6 +599,10 @@ function döngüselGeçişYap(hedefOda, dönüş, yön) {
 function portalGeçişYap(portal) {
   // Ses çal
   sesÇal(sesGeçiş);
+
+  // Geçiş animasyonu için eski durumu kaydet
+  geçişAnim.eskiMatris = aktifMatris.map(s => [...s]);
+  geçişAnim.eskiOda    = mevcutOda; 
 
   const hedef = portal.hedef;
 
@@ -606,6 +646,19 @@ function portalGeçişYap(portal) {
   // Sınır içinde tut
   topumuz.x = Math.max(r + 2, Math.min(topumuz.x, genişlik - r - 2));
   topumuz.y = Math.max(r + 2, Math.min(topumuz.y, yükseklik - r - 2));
+
+  // Portal yönüne göre animasyon yönü belirle
+if (portal.kaynak.kenar === "ALT") {
+  geçişAnim.yön   = "asagi";
+  geçişAnim.dikey = true;
+} else if (portal.kaynak.kenar === "UST") {
+  geçişAnim.yön   = "yukari";
+  geçişAnim.dikey = true;
+} else {
+  geçişAnim.dikey = false;
+}
+geçişAnim.aktif = true;
+geçişAnim.sayaç = 0;
 
   // Geçiş animasyonu
   geçişAnim.aktif  = true;
@@ -678,20 +731,114 @@ function çiz() {
 
   // ── Harita bloklarını çiz ──
   haritaÇiz();
-
+/*
   // ── Geçiş animasyonu efekti (beyaz flash) ──
   if (geçişAnim.aktif) {
     const t = 1 - geçişAnim.sayaç / geçişAnim.süre;  // 1→0 arası
     ctx.fillStyle = `rgba(120, 100, 255, ${t * 0.35})`;
     ctx.fillRect(0, 0, genişlik, yükseklik);
-  }
+  }*/
+  if (geçişAnim.aktif && geçişAnim.eskiMatris) {
+  const t = geçişAnim.sayaç / geçişAnim.süre;
 
+  if (geçişAnim.dikey) {
+    // Dikey kayma (portal geçişi)
+    const yukariMi = geçişAnim.yön === "asagi" ? -1 : 1;
+    const offset   = Math.round(yukariMi * t * yükseklik);
+
+    // Eski oda yukarı/aşağı kayıyor
+    ctx.save();
+    ctx.translate(0, offset);
+    _eskiOdaCiz(genişlik, yükseklik);
+    ctx.restore();
+
+    // Yeni oda karşı yönden geliyor
+    ctx.save();
+    ctx.translate(0, offset + yukariMi * -yükseklik);
+    haritaÇiz();
+    topuÇiz();
+    ctx.restore();
+
+  } else {
+    // Yatay kayma (döngüsel geçiş)
+    const kaymaMi = geçişAnim.yön === "sağ" ? -1 : 1;
+    const offset  = Math.round(kaymaMi * t * genişlik);
+
+    ctx.save();
+    ctx.translate(offset, 0);
+    _eskiOdaCiz(genişlik, yükseklik);
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(offset + kaymaMi * -genişlik, 0);
+    haritaÇiz();
+    topuÇiz();
+    ctx.restore();
+  }
+}
   // ── Topu çiz ──
   topuÇiz();
 
+  // Oda 3c uyarısı
+if (mevcutOda === 15) {
+  ctx.save();
+  ctx.fillStyle = "rgba(255, 80, 80, 0.85)";
+  ctx.font = "bold 18px 'Courier New'";
+  ctx.textAlign = "center";
+  ctx.fillText("⚠ SONSUZ DÖNGÜ ⚠", kanvas.width / 2, 30);
+  ctx.font = "13px 'Courier New'";
+  ctx.fillStyle = "rgba(255, 150, 150, 0.7)";
+  ctx.fillText("Gittiğin yol yol değil yeğen", kanvas.width / 2, 52);
+  ctx.restore();
+} 
   // ── Kenar göstergelerini çiz (hangi kenarda geçiş var?) ──
   kenarGöstergeÇiz(genişlik, yükseklik);
 }
+  // Geçiş animasyonu için eski odayı çizer
+function _eskiOdaCiz(genişlik, yükseklik) {
+  if (!geçişAnim.eskiMatris) return;
+
+  const eskiOdaNo = geçişAnim.eskiOda;
+  const matris    = geçişAnim.eskiMatris;
+
+  ctx.fillStyle = RENKLER.arkaplan;
+  ctx.fillRect(0, 0, genişlik, yükseklik);
+
+  // Grid
+  ctx.strokeStyle = RENKLER.grid;
+  ctx.lineWidth   = 0.5;
+  ctx.beginPath();
+  for (let s = 0; s <= matris[0].length; s++) {
+    ctx.moveTo(s * HUCRE_BOY, 0);
+    ctx.lineTo(s * HUCRE_BOY, yükseklik);
+  }
+  for (let r = 0; r <= matris.length; r++) {
+    ctx.moveTo(0, r * HUCRE_BOY);
+    ctx.lineTo(genişlik, r * HUCRE_BOY);
+  }
+  ctx.stroke();
+
+  // Duvarlar
+  const odaPaleti = RENKLER.odaRenkleri[eskiOdaNo] || { duvar: "#3a3a6a", kenar: "#5a5a9a" };
+  for (let r = 0; r < matris.length; r++) {
+    for (let s = 0; s < matris[0].length; s++) {
+      const deger = matris[r][s];
+      const px    = s * HUCRE_BOY;
+      const py    = r * HUCRE_BOY;
+      if (deger === HUCRE.DUVAR) {
+        ctx.fillStyle = odaPaleti.duvar;
+        ctx.fillRect(px, py, HUCRE_BOY, HUCRE_BOY);
+        ctx.fillStyle = odaPaleti.kenar;
+        ctx.fillRect(px, py, HUCRE_BOY, 3);
+        ctx.fillRect(px, py, 3, HUCRE_BOY);
+      } else if (deger === HUCRE.CIKIS) {
+        ctx.fillStyle = "#42f554";
+        ctx.fillRect(px, py, HUCRE_BOY, HUCRE_BOY);
+      }
+    }
+  }
+}  
+
 
 // ─── Grid çizgisi render ───
 function gridÇiz(genişlik, yükseklik) {
@@ -711,6 +858,11 @@ function gridÇiz(genişlik, yükseklik) {
 
 // ─── Harita blok render ───
 function haritaÇiz() {
+     // Oda 3c'deyse (index 15) uyarı arka planı çiz
+  if (mevcutOda === 15) {
+    ctx.fillStyle = "rgba(255, 50, 50, 0.08)";
+    ctx.fillRect(0, 0, kanvas.width, kanvas.height);
+  }
   for (let r = 0; r < matrisSatir; r++) {
     for (let s = 0; s < matrisSutun; s++) {
       const değer  = aktifMatris[r][s];
@@ -718,13 +870,13 @@ function haritaÇiz() {
       const py     = r * HUCRE_BOY;
 
       if (değer === HUCRE.DUVAR) {
-        // Dolgu
-        ctx.fillStyle = RENKLER.duvar;
-        ctx.fillRect(px, py, HUCRE_BOY, HUCRE_BOY);
-        // Üst kenar vurgusu (3B hissi)
-        ctx.fillStyle = RENKLER.duvarKenar;
-        ctx.fillRect(px, py, HUCRE_BOY, 3);
-        ctx.fillRect(px, py, 3, HUCRE_BOY);
+  // Mevcut odanın renk grubunu al, yoksa varsayılan gri
+  const odaPaleti = RENKLER.odaRenkleri[mevcutOda] || { duvar: "#3a3a6a", kenar: "#5a5a9a" };
+  ctx.fillStyle = odaPaleti.duvar;
+  ctx.fillRect(px, py, HUCRE_BOY, HUCRE_BOY);
+  ctx.fillStyle = odaPaleti.kenar;
+  ctx.fillRect(px, py, HUCRE_BOY, 3);
+  ctx.fillRect(px, py, 3, HUCRE_BOY);
 
       } else if (değer === HUCRE.PORTAL) {
         // Portal hücresi — parlak kırmızı
