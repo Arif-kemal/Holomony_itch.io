@@ -660,10 +660,6 @@ if (portal.kaynak.kenar === "ALT") {
 geçişAnim.aktif = true;
 geçişAnim.sayaç = 0;
 
-  // Geçiş animasyonu
-  geçişAnim.aktif  = true;
-  geçişAnim.sayaç  = 0; 
-  geçişAnim.yön    = "portal";
 
   // HUD güncelle
   hudGüncelle();
