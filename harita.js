@@ -1,64 +1,61 @@
-// ============================================================
-//  harita.js — Holonomy Küp Yüzey Bulmacası
-//  6 odanın grid matrisleri, sağ-sol döngüsü ve portal sistemi
-// ============================================================
+// harita.js
+// holonomy küp yüzey bulmacasının tüm oda haritalarını ve geçiş kurallarını tutar
+// oyun.js buradan veri çeker kendisi matrise dokunmaz
 
-// ─── Grid boyutları (oyun.js ile senkron olmalı) ───
-const SUTUN_SAYISI = 24;   // yatay hücre adedi
-const SATIR_SAYISI = 24;   // dikey hücre adedi
+// grid boyutları
+// oyun.js ile senkron tutmamız lazım ikisini birden değiştirmeliyiz
+const SUTUN_SAYISI = 24;
+const SATIR_SAYISI = 24;
 
-// ─── Hücre türü sabitleri ───
-// Sayısal değerler harita matrislerinde kullanılır.
-// İleride yeni blok türleri eklemek kolaylaşsın diye sabit olarak tanımladık.
+// hücre türü sabitleri
+// matris içinde bu sayıları kullanıyoruz
+// yeni blok eklemek istersen buraya yaz ve matrise koy
 const HUCRE = {
-  BOS:    0,   // geçilebilir alan
-  DUVAR:  1,   // katı blok / zemin
-  PORTAL: 2,   // portal işaretli hücre (görsel farklı çizilir)
-  CIKIS:3,   // çıkış noktası (oda3'teki 3'lük hücreler)
-  GECIS5: 5,   // oda1b'ye geçiş tetikleyicisi
-  GECIS6: 6,   // oda1b spawn noktası
-  GECIS8: 8,   // başa döndürücü
-  GECIS11: 11, // oda1c spawn noktası
+  BOS:    0,   // oyuncu geçebilir
+  DUVAR:  1,   // katı blok geçilemez
+  PORTAL: 2,   // portal noktası farklı renk çizilecek
+  CIKIS:  3,   // oda3 ve diğerlerindeki çıkış noktaları
+  GECIS5: 5,   // buraya basılınca oda1b ye geçiş tetikleniyor
+  GECIS6: 6,   // oda1b içindeki spawn noktası buraya doğuyoruz
+  GECIS8: 8,   // buraya basılınca başa döndürüyor
+  GECIS11: 11, // oda1c için spawn noktası
 };
-// ============================================================
-//  YARDIMCI: Boş oda şablonu üretici
-//  Sadece dış çerçevesi 1, içi 0 olan 12×20 matris döner.
-//  Kendiniz dolduracaksınız — bu sadece başlangıç iskeleti.
-// ============================================================
+
+// boş oda şablonu
+// sadece dış çerçevesi duvar olan temiz bir 24x24 matris üretir
+// kendi odanı buradan başlatabilirsin içini kendin doldur
 function bosOdaOlustur() {
-  // Önce tamamı 0 olan 12 satır × 20 sütun dizi yap
   const matris = Array.from({ length: SATIR_SAYISI }, () =>
     new Array(SUTUN_SAYISI).fill(HUCRE.BOS)
   );
 
-  // Üst ve alt satırları tamamen duvar yap
   for (let s = 0; s < SUTUN_SAYISI; s++) {
-    matris[0][s]                  = HUCRE.DUVAR;  // üst çerçeve
-    matris[SATIR_SAYISI - 1][s]   = HUCRE.DUVAR;  // alt çerçeve
+    matris[0][s]                  = HUCRE.DUVAR;
+    matris[SATIR_SAYISI - 1][s]   = HUCRE.DUVAR;
   }
 
-  // Sol ve sağ sütunları tamamen duvar yap
   for (let r = 0; r < SATIR_SAYISI; r++) {
-    matris[r][0]                  = HUCRE.DUVAR;  // sol çerçeve
-    matris[r][SUTUN_SAYISI - 1]   = HUCRE.DUVAR;  // sağ çerçeve
+    matris[r][0]                  = HUCRE.DUVAR;
+    matris[r][SUTUN_SAYISI - 1]   = HUCRE.DUVAR;
   }
 
   return matris;
 }
-// ============================================================
-//  ODA MATRİSLERİ — 20 satır × 20 sütun
-//  0 = boşluk (geçilebilir), 1 = duvar, 3 = çıkış
-//
-//  Satır  0 = üst kenar,  Satır 19 = alt kenar (zemin)
-//  Sütun  0 = sol kenar,  Sütun 19 = sağ kenar
-//
-//  Geçiş koridorları:
-//    SAĞ  → sütun 19'da 0 olan satırlar
-//    SOL  → sütun  0'da 0 olan satırlar
-//    ÜST  → satır  0'da 0 olan sütunlar  (portal girişi)
-//    ALT  → satır 19'da 0 olan sütunlar  (portal girişi)
-// ============================================================
 
+// oda matrislerini okurken dikkat
+// 0 geçilebilir alan  1 duvar  3 çıkış noktası
+// satır 0 üst kenar  satır 23 alt kenar
+// sütun 0 sol kenar  sütun 23 sağ kenar
+// kenarda 0 olan hücreler geçiş koridoru oluyor sol sağ üst alt
+
+// oda1
+// başlangıç odası oyuncu burada doğuyor
+// satır 0 da 5 ler var bunlar oda1b ye geçiş kapısı
+// sağ taraf tamamen duvar yani sağa çıkış yok
+// sol üst köşeden sol tarafa geçiş var oda2 ye gider
+// ortada satır 10 sütun 12 de bir portal var
+// alt kısım satır 16-19 tamamen duvar zemin gibi düşün
+// satır 20-23 farklı bir koridor yapısı var aşağıya devam ediyor
 const oda1Matrisi = [
   [1,5,5,5,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
@@ -85,6 +82,13 @@ const oda1Matrisi = [
   [0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,1,0,0,1,1,0,0,0,0],
   [0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,1,0,0,1,1,0,0,1,1]
 ];
+
+// oda2
+// oda1 in sağında ya da solunda döngüsel bağlı
+// satır 0 da 5 ler var oda1b geçiş kapısı tıpkı oda1 gibi ama sağ üste
+// üst kısım satır 0-7 tamamen duvar bloklu yani buradan geçiş yok
+// asıl oyun alanı satır 8-19 arası sütun 8-23 de açık
+// alt satırlarda oda3 e portal geçişi var portaller listesinde tanımlı
 const oda2Matrisi = [
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,5,5,5,1],
   [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
@@ -111,6 +115,14 @@ const oda2Matrisi = [
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0]
 ];
+
+// oda3
+// oda2 nin altından portal ile düşülüyor buraya
+// dikkat burası zor bir kavşak noktası
+// sağa gidersen düz oda4 e girersin normal devam
+// alta gidersen 180 derece dönmüş oda6 ya girersin
+// satır 15-17 de 3 lük hücreler var bunlar çıkış noktası
+// çıkışa ulaşmak için önce o dar koridoru geçmen lazım
 const oda3Matrisi = [
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
@@ -138,6 +150,11 @@ const oda3Matrisi = [
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1]
 ];
 
+// oda4
+// oda3 ün sağında normal geçişle geliniyor
+// aynı zamanda oda4 altından oda5 e portal geçişi var
+// yapısı oda2 ye çok benziyor ama sol üst köşe farklı
+// satır 1-3 sütun 16-23 de açık alan var üstten erişim için
 const oda4Matrisi = [
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],
@@ -164,6 +181,12 @@ const oda4Matrisi = [
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0]
 ];
+
+// oda5
+// oda4 ün altından portal ile düşülüyor
+// yapısı oda3 e çok benziyor ama çıkış burada yok
+// alt kısım satır 16-19 tamamen duvar
+// alttan oda6 ya portal bağlantısı var portaller listesinde
 const oda5Matrisi = [
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
@@ -190,6 +213,12 @@ const oda5Matrisi = [
   [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1]
 ];
+
+// oda6
+// oda5 in altından portal ile geliyor
+// alttan oda1 e portal bağlantısı var yani bu noktada döngü kapanıyor
+// sola gidersen oda3 e gidilince alta gidilince 180 derece dönmüş gelinebilir buraya
+// yapı oda2 ve oda4 e çok benziyor
 const oda6Matrisi = [
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
@@ -217,16 +246,21 @@ const oda6Matrisi = [
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1]
 ];
 
+// buradan itibaren b serisi odalar başlıyor
+// oda1 ve oda2 deki 5 li hücrelere basılınca bu seriye geçiliyor
+// oda1b de spawn noktası 6 olan hücre satır 2 sütun 22 de
 
-/*oda 1 ve 2 deki matriksde 5 yazan yerler ile odab yazan haritaya geçiceğiz orda oda1bMatrisi deki 6 yazan yer ile başlıyoruz.
- ordan alta gidicez sağ ile oda 2 ye gidip aşşağıya gidiceğiz. oda 3 e üstten düşücez
-  (bu kısım biraz zorlayıcı çünkü eğer oda 3 de sağdan gidersek dümdüz oda 4 e gireriz ama eğer alta gidersek 180 derece dönmüş  oda 6 ya girecek orda da sola gidince odac adlıa haritaya geçer ve eğer isterse o anda bitirebilir)*/
-//90 derece çevrilmiş hali.
+// oda1b
+// 90 derece çevrilmiş hali olarak tasarlandı
+// satır 2 sütun 22 de 6 var burası spawn noktası
+// sol taraf satır 9-15 de tek sütun açık dar koridor
+// satır 16-19 tamamen duvar zemin bloğu
+// üstten oda6b ye bağlantı var portaller listesinde
 const oda1bMatrisi=[
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
-  [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,6,0],
-  [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,6,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
@@ -249,6 +283,10 @@ const oda1bMatrisi=[
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1]
 ];
 
+// oda2b
+// oda1b nin sağında
+// yapısı oda5 e benziyor üst kısım kapalı alt açık
+// altından oda3b ye portal bağlantısı var
 const oda2bMatrisi=[
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
@@ -276,6 +314,10 @@ const oda2bMatrisi=[
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1]
 ];
 
+// oda3b
+// oda2b nin altından geliyor
+// sağ yarı tamamen duvar sol yarı açık
+// altından oda4b ye geçiş yok sadece sağa geçiş var
 const oda3bMatrisi = [
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
@@ -302,6 +344,12 @@ const oda3bMatrisi = [
   [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1]
 ];
+
+// oda4b
+// oda3b nin sağında
+// satır 19 da 8 ler var bunlar oda1b ye geri döndürüyor
+// bu oda hâlâ geliştirme aşamasında yorumda da yazdık
+// altından oda5b ye portal bağlantısı var
 const oda4bMatrisi = [
   [1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1],
   [0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
@@ -322,12 +370,18 @@ const oda4bMatrisi = [
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-  [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,8,8,8,1],//burası daha geliştirilme aşamasında fazla karmaşık 8 ler bizi 6 yazan oda1b ye götürüsün
+  [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,8,8,8,1],// 8 ler burası oda1b ye geri döndürüyor henüz tam bitmedi
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,1]
 ];
+
+// oda5b
+// oda4b nin altından geliyor
+// satır 17-19 da 3 lük hücreler var c serisine giriş noktası burası
+// alt kısımdan oda1c ye geçiş var ama dönmüş halde geliyor
+// burası c serisine açılan kapı
 const oda5bMatrisi = [
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
@@ -339,7 +393,7 @@ const oda5bMatrisi = [
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1],
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],//burası oda1b ye geri döner
+  [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],// burası oda1b ye geri dönüş koridoru
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -349,11 +403,15 @@ const oda5bMatrisi = [
   [1,1,1,1,1,1,3,3,3,1,1,1,1,1,1,0,0,0,1,1,1,1,1,1],
   [1,1,1,1,1,1,3,3,3,1,1,1,1,1,1,0,0,0,1,1,1,1,1,1],
   [1,1,1,1,1,1,3,3,3,1,1,1,1,1,1,0,0,0,1,1,1,1,1,1],
-  [0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0,0,0,1,1,0,0,0,0],  // satır 20
-  [0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0,0,0,1,1,0,0,0,0],  // satır 21
-  [1,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0,0,0,1,1,0,0,0,1],  // satır 22 - virgül var!
-  [1,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0,0,0,1,1,0,0,0,1]   // satır 23 - son satır, virgül yok
-];                           //burası 180 derece dönmüş oda1 e gider
+  [0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0,0,0,1,1,0,0,0,0],
+  [0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0,0,0,1,1,0,0,0,0],
+  [1,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0,0,0,1,1,0,0,0,1],
+  [1,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0,0,0,1,1,0,0,0,1] // alt kısım 180 derece dönmüş oda1 e gidiyor
+];
+
+// oda6b
+// oda5b nin sağında
+// altından oda1b ye döngüsel geçiş var yani b serisi burada kapanıyor
 const oda6bMatrisi = [
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
@@ -381,9 +439,15 @@ const oda6bMatrisi = [
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1]
 ];
 
+// buradan itibaren c serisi odalar başlıyor
+// oda5b nin altından oda1c ye geçiliyor
+// bu serinin amacı oyuncuyu son çıkışa götürmek
 
-
-
+// oda1c
+// c serisinin başlangıcı oda5b den düşülüyor
+// satır 22 de spawn noktası var yorumda belirtildi
+// soldaki koridordan aşağı inince oyun bitiyor
+// satır 22 sütun 0-3 te açık alan var oradan çıkış
 const oda1cMatrisi = [
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
@@ -407,9 +471,15 @@ const oda1cMatrisi = [
   [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
   [0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0,0,0,1,1,0,0,0,0],//burda doğarız ve hemen solumuzdan aşşağı gidince oyun biter
+  [0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0,0,0,1,1,0,0,0,0],// burası spawn noktası soldan aşağı gidince oyun bitiyor
   [0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1]
 ];
+
+// oda2c
+// oda1c nin altından portal ile geliyor
+// satır 2-5 arasında sütun 15-17 de 3 lük hücreler var çıkış noktası
+// sol üst köşede de geçiş var
+// burası c serisinin en önemli odası çıkışa en yakın yer
 const oda2cMatrisi = [
   [1,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0,0,0,1,1,0,0,0,1],
   [0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,0,0,0,1,1,0,0,0,0],
@@ -436,6 +506,12 @@ const oda2cMatrisi = [
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1]
 ];
+
+// oda3c
+// oda2c nin sağında ya da altından geliyor
+// sol taraf satır 4-7 de tek sütun açık dar geçit
+// alt satırlar tamamen kapalı
+// sağa gidince oda4c ye geçiyor
 const oda3cMatrisi = [
   [1,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
   [0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
@@ -462,6 +538,11 @@ const oda3cMatrisi = [
   [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1]
 ];
+
+// oda4c
+// oda3c nin sağında
+// yapısı oda6 ya çok benziyor
+// altından oda5c ye portal bağlantılı
 const oda4cMatrisi = [
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
@@ -488,6 +569,11 @@ const oda4cMatrisi = [
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1]
 ];
+
+// oda5c
+// oda4c nin altından geliyor
+// yapısı oda3 e çok benziyor kapalı bir oda
+// altından oda6c ye geçiş yok yani burası çıkmaz sokak değil ama oda6c bağlı sağa gidince
 const oda5cMatrisi = [
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
@@ -514,6 +600,13 @@ const oda5cMatrisi = [
   [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1]
 ];
+
+// oda6c
+// oda5c nin sağında
+// sol taraf biraz karmaşık dar koridorlar var satır 14-17 arasında
+// satır 17 sütun 2-3 te 8 ler var bunlar geri döndürüyor
+// sağ taraf satır 4-13 arasında duvar blokları var geçiş yok
+// altından oda7c ye portal bağlantılı
 const oda6cMatrisi = [
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1],
@@ -532,7 +625,7 @@ const oda6cMatrisi = [
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,1,1],
   [0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
   [1,1,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
-  [1,0,8,8,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+  [1,0,8,8,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],// 8 ler burada da geri döndürüyor
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1],
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
@@ -540,6 +633,12 @@ const oda6cMatrisi = [
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0]
 ];
+
+// oda7c
+// c serisinin son odası
+// oda6c nin altından ya da oda2c den sağa gidince gelinebiliyor
+// yapısı oda3b ye çok benziyor sağ yarı kapalı
+// buradan sola gidince oda2c ye döner sağa gidince oda2c ye döner yani kapalı döngü
 const oda7cMatrisi = [
   [1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1],
   [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
@@ -566,135 +665,92 @@ const oda7cMatrisi = [
   [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
   [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1]
 ];
-// ============================================================
-//  ODA HAVUZU
-//  Index 0 = oda1, index 1 = oda2, ... (0-tabanlı erişim için)
-//  oyun.js içinden: odaHavuzu[mevcutOda - 1]  → o odanın matrisi
-// ============================================================
+
+// oda havuzu
+// oyun.js buradan çeker odaNo-1 ile indexe erişir
+// sıra önemli karıştırma
 const odaHavuzu = [
-  oda1Matrisi,
-  oda2Matrisi,
-  oda3Matrisi,
-  oda4Matrisi,
-  oda5Matrisi,
-  oda6Matrisi,
-  oda1bMatrisi,
-  oda2bMatrisi,
-  oda3bMatrisi,
-  oda4bMatrisi,
-  oda5bMatrisi,
-  oda6bMatrisi,
-  oda1cMatrisi,
-  oda2cMatrisi,
-  oda3cMatrisi,
-  oda4cMatrisi,
-  oda5cMatrisi,
-  oda6cMatrisi,
-  oda7cMatrisi,
+  oda1Matrisi,   // index 0 → oda 1
+  oda2Matrisi,   // index 1 → oda 2
+  oda3Matrisi,   // index 2 → oda 3
+  oda4Matrisi,   // index 3 → oda 4
+  oda5Matrisi,   // index 4 → oda 5
+  oda6Matrisi,   // index 5 → oda 6
+  oda1bMatrisi,  // index 6 → oda 7  (b serisi başlıyor)
+  oda2bMatrisi,  // index 7 → oda 8
+  oda3bMatrisi,  // index 8 → oda 9
+  oda4bMatrisi,  // index 9 → oda 10
+  oda5bMatrisi,  // index 10 → oda 11
+  oda6bMatrisi,  // index 11 → oda 12
+  oda1cMatrisi,  // index 12 → oda 13 (c serisi başlıyor)
+  oda2cMatrisi,  // index 13 → oda 14
+  oda3cMatrisi,  // index 14 → oda 15
+  oda4cMatrisi,  // index 15 → oda 16
+  oda5cMatrisi,  // index 16 → oda 17
+  oda6cMatrisi,  // index 17 → oda 18
+  oda7cMatrisi,  // index 18 → oda 19
 ];
 
-// ============================================================
-//  SAĞ-SOL DÖNGÜSEL GEÇİŞ TABLOSU
-//  Sağa gidince bir sonraki oda (1→2→…→6→1)
-//  Sola gidince bir önceki oda (1→6→…→2→1)
-//  Bu geçişlerde harita DÖNMEZ (donus: 0).
-//  Top yeni odaya giriş yaptığı kenarın karşı ucundan çıkar.
-//
-//  Veri yapısı:
-//    sagGecis[n]  = { hedefOda, donus }
-//    solGecis[n]  = { hedefOda, donus }
-//  n = mevcut oda (1-tabanlı)
-// =========================
+// sol geçiş tablosu
+// sola çıkınca hangi odaya gittiğini tutar
+// dönüş değeri 0 demek harita dönmüyor
 const solGecis = {
-  // Normal odalar
+  // normal odalar döngüsel bağlı
   1: { hedefOda: 2, donus: 0 },
   2: { hedefOda: 1, donus: 0 },
   3: { hedefOda: 4, donus: 0 },
   4: { hedefOda: 3, donus: 0 },
   5: { hedefOda: 6, donus: 0 },
   6: { hedefOda: 5, donus: 0 },
-  // B odaları
+  // b odaları
   7:  { hedefOda: 8,  donus: 0 },  // oda1b → oda2b
-  8:  { hedefOda: 7,  donus: 0 },  // oda2b → oda1b (geri)
-  9:  { hedefOda: 10, donus: 0 },  // oda3b → oda4b? BUNU KONTROL ET
-  10: { hedefOda: 9,  donus: 0 },  // oda4b → oda3b (geri)
+  8:  { hedefOda: 7,  donus: 0 },  // oda2b → oda1b geri dön
+  9:  { hedefOda: 10, donus: 0 },  // oda3b → oda4b bunu kontrol etmemiz lazım
+  10: { hedefOda: 9,  donus: 0 },  // oda4b → oda3b geri dön
   11: { hedefOda: 12, donus: 0 },  // oda5b → oda6b
-  12: { hedefOda: 11, donus: 0 },  // oda6b → oda5b (geri)
-  // C odaları
+  12: { hedefOda: 11, donus: 0 },  // oda6b → oda5b geri dön
+  // c odaları
   14: { hedefOda: 19, donus: 0 },  // oda2c → oda7c
-  15: { hedefOda: 14, donus: 0 },  // oda3c → oda2c (geri)
-  16: { hedefOda: 15, donus: 0 },  // oda4c → oda3c (geri)
+  15: { hedefOda: 14, donus: 0 },  // oda3c → oda2c geri dön
+  16: { hedefOda: 15, donus: 0 },  // oda4c → oda3c geri dön
   17: { hedefOda: 18, donus: 0 },  // oda5c → oda6c
-  18: { hedefOda: 17, donus: 0 },  // oda6c → oda5c (geri)
+  18: { hedefOda: 17, donus: 0 },  // oda6c → oda5c geri dön
   19: { hedefOda: 14, donus: 0 },  // oda7c → oda2c
 };
 
+// sağ geçiş tablosu
+// sağa çıkınca hangi odaya gittiğini tutar
 const sagGecis = {
-  // Normal odalar
+  // normal odalar döngüsel bağlı
   1: { hedefOda: 2, donus: 0 },
   2: { hedefOda: 1, donus: 0 },
   3: { hedefOda: 4, donus: 0 },
   4: { hedefOda: 3, donus: 0 },
   5: { hedefOda: 6, donus: 0 },
   6: { hedefOda: 5, donus: 0 },
-  // B odaları
+  // b odaları
   7:  { hedefOda: 8,  donus: 0 },  // oda1b → oda2b
-  8:  { hedefOda: 7,  donus: 0 },  // oda2b → oda1b (geri, sağda duvar yok diye)
+  8:  { hedefOda: 7,  donus: 0 },  // oda2b → oda1b sağda duvar yok diye geri dönüyor
   9:  { hedefOda: 10, donus: 0 },  // oda3b → oda4b
   10: { hedefOda: 11, donus: 0 },  // oda4b → oda5b
   11: { hedefOda: 12, donus: 0 },  // oda5b → oda6b
-  12: { hedefOda: 7,  donus: 0 },  // oda6b → oda1b (döngü)
-  // C odaları
+  12: { hedefOda: 7,  donus: 0 },  // oda6b → oda1b döngü kapandı
+  // c odaları
   14: { hedefOda: 19, donus: 0 },  // oda2c → oda7c
   15: { hedefOda: 16, donus: 0 },  // oda3c → oda4c
   16: { hedefOda: 17, donus: 0 },  // oda4c → oda5c
-  17: { hedefOda: 14, donus: 0 },  // oda5c → oda2c (geri dön)
-  19: { hedefOda: 14,  donus: 0 },  // oda7c → oda2 (normal odaya dön)
+  17: { hedefOda: 14, donus: 0 },  // oda5c → oda2c geri dön
+  19: { hedefOda: 14, donus: 0 },  // oda7c → oda2c normal odaya dön
 };
 
-// ============================================================
-//  PORTAL (ÜST/ALT KENAR GEÇİŞ) SİSTEMİ
-//
-//  Her portal nesnesi şu alanları içerir:
-//
-//    kaynak.oda       → portali barındıran oda numarası (1-6)
-//    kaynak.kenar     → "UST" | "ALT" | "SAG" | "SOL"
-//    kaynak.pozisyon  → kenar boyunca 0.0–1.0 arası yüzde
-//                       (0.5 = tam orta)
-//
-//    hedef.oda        → ışınlanacak oda numarası
-//    hedef.kenar      → ışınlandıktan sonra hangi kenardan girilir
-//    hedef.pozisyon   → hedef kenarda konumlanma yüzdesi
-//
-//    donus            → yeni odanın haritasının döneceği açı
-//                       0, 90, 180 veya 270 (saat yönü, derece)
-//
-//  DÖNÜŞ MANTIĞI:
-//    Yerçekimi ekranda her zaman aşağı yönde sabit kalır.
-//    Yeni odaya girildiğinde harita `donus` kadar döndürülür.
-//    Bu sayede top "tavan"dan girip "yer"e düşüyormuş gibi hissedilir.
-//
-//  ÖRNEK:
-//    Oda 1'in tavanından çıkıp Oda 4'ün sağ duvarına giren top için
-//    donus: 90 verilirse → Oda 4'ün haritası 90° döner,
-//    sağ duvar artık "taban" gibi davranır.
-//
-//  ŞİMDİLİK BOŞ — İçini siz dolduracaksınız.
-// ============================================================
-// ============================================================
-//  PORTAL (ÜST/ALT KENAR GEÇİŞ) SİSTEMİ - TÜM KURALLAR
-// ============================================================
-// ============================================================
-//  PORTAL (ÜST/ALT KENAR GEÇİŞ) SİSTEMİ - TÜM KURALLAR
-// ============================================================
-
-// ============================================================
-//  YARDIMCI FONKSİYONLAR
-//  oyun.js bu fonksiyonları kullanır — doğrudan matrise dokunmaz.
-// ============================================================
+// portal sistemi
+// üst ve alt kenarlardan geçiş kuralları burada
+// aralik: o kenardaki hangi sütun aralığında aktif olduğunu gösteriyor
+// hizalama: hedef odada hangi pozisyona spawn edileceği 0-1 arası
+// donus: hedef odanın kaç derece dönmüş görüneceği
 const portaller = [
-  // ── NORMAL ODA GEÇİŞLERİ ──
-  // Oda 2 ALT → Oda 3 ÜST
+  // normal oda geçişleri
+  // oda2 altı → oda3 üstü
   {
     kaynak: { oda: 2, kenar: "ALT", aralik: [8, 15] },
     hedef:  { oda: 3, kenar: "UST", hizalama: 0.46 },
@@ -705,7 +761,7 @@ const portaller = [
     hedef:  { oda: 2, kenar: "ALT", hizalama: 0.46 },
     donus: 0,
   },
-  // Oda 4 ALT → Oda 5 ÜST
+  // oda4 altı → oda5 üstü
   {
     kaynak: { oda: 4, kenar: "ALT", aralik: [8, 15] },
     hedef:  { oda: 5, kenar: "UST", hizalama: 0.46 },
@@ -716,7 +772,7 @@ const portaller = [
     hedef:  { oda: 4, kenar: "ALT", hizalama: 0.46 },
     donus: 0,
   },
-  // Oda 6 ALT → Oda 1 ÜST
+  // oda6 altı → oda1 üstü döngü kapanıyor
   {
     kaynak: { oda: 6, kenar: "ALT", aralik: [8, 15] },
     hedef:  { oda: 1, kenar: "UST", hizalama: 0.46 },
@@ -728,8 +784,8 @@ const portaller = [
     donus: 0,
   },
 
-  // ── B ODA GEÇİŞLERİ ──
-  // Oda 2b ALT → Oda 3b ÜST
+  // b oda geçişleri
+  // oda2b altı → oda3b üstü
   {
     kaynak: { oda: 8, kenar: "ALT", aralik: [8, 15] },
     hedef:  { oda: 9, kenar: "UST", hizalama: 0.46 },
@@ -740,73 +796,71 @@ const portaller = [
     hedef:  { oda: 8, kenar: "ALT", hizalama: 0.46 },
     donus: 0,
   },
-  // Oda 4b ALT → Oda 5b ÜST
-{
-  kaynak: { oda: 10, kenar: "ALT", aralik: [8, 15] },
-  hedef:  { oda: 11, kenar: "UST", hizalama: 0.46 },
-  donus: 0,
-},
-{
-  kaynak: { oda: 11, kenar: "UST", aralik: [8, 15] },
-  hedef:  { oda: 10, kenar: "ALT", hizalama: 0.46 },
-  donus: 0,
-},
-// Oda 5b ALT → Oda 1c ÜST (sol taraf hariç tüm alt)
-// Oda 5b ALT → Oda 1c ALT (sağ alt köşeye spawn)
-{
-  kaynak: { oda: 11, kenar: "ALT", aralik: [0, 23] },
-  hedef:  { oda: 13, kenar: "ALT", hizalama: 0.92 },
-  donus: 0,
-},
-// Oda 6b ALT → Oda 1b ÜST (döngü)
+  // oda4b altı → oda5b üstü
   {
-  kaynak: { oda: 12, kenar: "ALT", aralik: [8, 15] },
-  hedef:  { oda: 7,  kenar: "UST", hizalama: 0.46 },
-  donus: 0,
-},
-{
-  kaynak: { oda: 7, kenar: "UST", aralik: [8, 15] },
-  hedef:  { oda: 12, kenar: "ALT", hizalama: 0.46 },
-  donus: 0,
-},
-  
+    kaynak: { oda: 10, kenar: "ALT", aralik: [8, 15] },
+    hedef:  { oda: 11, kenar: "UST", hizalama: 0.46 },
+    donus: 0,
+  },
+  {
+    kaynak: { oda: 11, kenar: "UST", aralik: [8, 15] },
+    hedef:  { oda: 10, kenar: "ALT", hizalama: 0.46 },
+    donus: 0,
+  },
+  // oda5b tüm alt kenarından oda1c ye geçiş sağ alta spawn ediyor
+  {
+    kaynak: { oda: 11, kenar: "ALT", aralik: [0, 23] },
+    hedef:  { oda: 13, kenar: "ALT", hizalama: 0.92 },
+    donus: 0,
+  },
+  // oda6b altı → oda1b üstüne döngü
+  {
+    kaynak: { oda: 12, kenar: "ALT", aralik: [8, 15] },
+    hedef:  { oda: 7,  kenar: "UST", hizalama: 0.46 },
+    donus: 0,
+  },
+  {
+    kaynak: { oda: 7, kenar: "UST", aralik: [8, 15] },
+    hedef:  { oda: 12, kenar: "ALT", hizalama: 0.46 },
+    donus: 0,
+  },
 
-  // ── C ODA GEÇİŞLERİ ──
-  // Oda 1c ALT → Oda 2c ÜST (bitiş odası)
+  // c oda geçişleri
+  // oda1c altı sağ taraftan → oda2c üstüne
   {
     kaynak: { oda: 13, kenar: "ALT", aralik: [16, 19] },
     hedef:  { oda: 14, kenar: "UST", hizalama: 0.67 },
     donus: 0,
   },
   {
-  kaynak: { oda: 13, kenar: "ALT", aralik: [7, 19] },
-  hedef:  { oda: 14, kenar: "UST", hizalama: 0.29 },
-  donus: 0,
-},
-  // Oda 2c ALT → Oda 3c ÜST
+    kaynak: { oda: 13, kenar: "ALT", aralik: [7, 19] },
+    hedef:  { oda: 14, kenar: "UST", hizalama: 0.29 },
+    donus: 0,
+  },
+  // oda2c altı → oda3c üstü
   {
-  kaynak: { oda: 14, kenar: "ALT", aralik: [8, 15] },
-  hedef:  { oda: 15, kenar: "UST", hizalama: 0.5 },
-  donus: 0,
-},
-  // Oda 4c ALT → Oda 5c ÜST
+    kaynak: { oda: 14, kenar: "ALT", aralik: [8, 15] },
+    hedef:  { oda: 15, kenar: "UST", hizalama: 0.5 },
+    donus: 0,
+  },
+  // oda4c altı → oda5c üstü
   {
     kaynak: { oda: 16, kenar: "ALT", aralik: [8, 15] },
     hedef:  { oda: 17, kenar: "UST", hizalama: 0.46 },
     donus: 0,
   },
-  // Oda 6c ALT → Oda 7c ÜST
+  // oda6c altı → oda7c üstü
   {
     kaynak: { oda: 18, kenar: "ALT", aralik: [8, 15] },
     hedef:  { oda: 19, kenar: "UST", hizalama: 0.46 },
     donus: 0,
   },
 ];
-/**
- * Belirtilen odanın ham matrisini döner (0-tabanlı değil, 1-tabanlı oda no).
- * @param {number} odaNo  1–6 arası oda numarası
- * @returns {number[][]}  12×20 matris
- */
+
+// yardımcı fonksiyonlar
+// oyun.js bunları çağırır matrise doğrudan dokunmaz
+
+// oda matrisini döner 1 tabanlı oda numarası alıyor
 function odaMatrisiAl(odaNo) {
   if (odaNo < 1 || odaNo > odaHavuzu.length) {
     console.warn(`odaMatrisiAl: geçersiz oda numarası ${odaNo}`);
@@ -815,70 +869,41 @@ function odaMatrisiAl(odaNo) {
   return odaHavuzu[odaNo - 1];
 }
 
-/**
- * Bir matrisi saat yönünde 90° döndürür.
- * Döndürme: yeni[s][r] = eski[SATIR-1-r][s]
- * (12×20 matris → 20×12 olur dikkat! Grid kare değil.)
- *
- * NOT: Holonomy'de tüm odalar kare DEĞİL (20×12).
- * Bu yüzden 90° döndürme satır/sütun sayısını değiştirir.
- * oyun.js render sırasında genişlik/yüksekliği buna göre ayarlar.
- *
- * @param {number[][]} matris  Kaynak matris
- * @returns {number[][]}       Döndürülmüş yeni matris (kopya)
- */
+// matrisi saat yönünde 90 derece döndürür
+// dikkat 24x24 kare olduğu için boyut değişmiyor ama farklı şekilli matris olsa değişirdi
+// yeni[s][r] = eski[satir-1-r][s] formülü kullanılıyor
 function matrisDondur90(matris) {
   const eskiSatir  = matris.length;
   const eskiSutun  = matris[0].length;
-  // Yeni matris: eskiSutun satır × eskiSatir sütun
   const yeni = Array.from({ length: eskiSutun }, () =>
     new Array(eskiSatir).fill(0)
   );
   for (let r = 0; r < eskiSatir; r++) {
     for (let s = 0; s < eskiSutun; s++) {
-      // Saat yönü 90°: yeni[s][eskiSatir - 1 - r] = eski[r][s]
       yeni[s][eskiSatir - 1 - r] = matris[r][s];
     }
   }
   return yeni;
 }
 
-/**
- * Bir matrisi istenen açı kadar döndürür.
- * Geçerli açılar: 0, 90, 180, 270
- * Diğer değerler console uyarısı verir ve orijinal matrisi döner.
- *
- * @param {number[][]} matris  Kaynak matris
- * @param {number}     aci     Dönüş açısı (0 / 90 / 180 / 270)
- * @returns {number[][]}       Döndürülmüş yeni matris (kopya)
- */
+// istenen açıda döndürür 0 90 180 270 kabul ediyor
+// 90 kaç kez çağırılacağını hesaplıyor
 function matrisDondur(matris, aci) {
-  // Açıyı 0-360 aralığına normalize et
   const normalAci = ((aci % 360) + 360) % 360;
 
-  if (normalAci === 0)   return matris.map(satir => [...satir]); // derin kopya
+  if (normalAci === 0)   return matris.map(satir => [...satir]);
   if (normalAci === 90)  return matrisDondur90(matris);
   if (normalAci === 180) return matrisDondur90(matrisDondur90(matris));
   if (normalAci === 270) return matrisDondur90(matrisDondur90(matrisDondur90(matris)));
 
-  console.warn(`matrisDondur: desteklenmeyen açı ${aci}, orijinal döndürüldü`);
+  console.warn(`matrisDondur: desteklenmeyen açı ${aci} orijinal döndürüldü`);
   return matris.map(satir => [...satir]);
 }
 
-/**
- * Verilen oda + kenar + pozisyon için eşleşen portalı arar.
- * Bulamazsa null döner.
- *
- * @param {number} odaNo     Kaynak oda (1-6)
- * @param {string} kenar     "UST" | "ALT" | "SAG" | "SOL"
- * @param {number} pozisyon  0.0–1.0 arası normalize konum
- * @param {number} tolerans  Pozisyon eşleşme toleransı (varsayılan 0.15)
- * @returns {object|null}    Portal nesnesi ya da null
- */
+// portal bulma fonksiyonu
+// topun piksel pozisyonunu alıp aralıkla karşılaştırıyor
+// eşleşen portal nesnesini döner bulamazsa null
 function portalBul(odaNo, kenar, piksel, kanal) {
-  // piksel: topun kenar üzerindeki x veya y piksel pozisyonu
-  // kanal: o eksenin toplam piksel uzunluğu (canvas genişliği veya yüksekliği)
-  // hücre indeksine çeviriyoruz
   const hucrePos = (piksel / kanal) * SUTUN_SAYISI;
 
   for (const p of portaller) {
@@ -892,20 +917,12 @@ function portalBul(odaNo, kenar, piksel, kanal) {
   return null;
 }
 
-/**
- * Sağa geçiş bilgisini döner.
- * @param {number} odaNo  Mevcut oda (1-6)
- * @returns {{ hedefOda: number, donus: number }}
- */
+// sağa geçiş bilgisi döner
 function sagGecisAl(odaNo) {
   return sagGecis[odaNo];
 }
 
-/**
- * Sola geçiş bilgisini döner.
- * @param {number} odaNo  Mevcut oda (1-6)
- * @returns {{ hedefOda: number, donus: number }}
- */
+// sola geçiş bilgisi döner
 function solGecisAl(odaNo) {
   return solGecis[odaNo];
 }

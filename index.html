@@ -6,20 +6,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Holonomy — Küp Yüzey Bulmacası</title>
   <style>
-    /* ─── Temel sayfa sıfırlama ─── */
+    /* her şeyi sıfırla tarayıcı varsayılanları işleri karıştırır */
     *, *::before, *::after {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
 
-    /* ─── Koyu uzay teması ─── */
+    /* :root tüm renkler ve tema değişkenleri burada toplanıyor,
+       bir rengi değiştirmek istersen buraya bak yeter */
     :root {
       --arkaplan:      #0a0a14;
       --panel-bg:      #11111f;
       --panel-kenar:   #2a2a4a;
-      --vurgu:         #7c6af0;   /* mor-vurgu rengi */
-      --vurgu2:        #f04f7c;   /* pembe-portal rengi */
+      --vurgu:         #7c6af0;   /*mor*/
+      --vurgu2:        #f04f7c;   /*pembe erkek rengi portal rengiyle aynı*/
       --yazi:          #d0cef5;
       --yazi-soluk:    #6060a0;
       --zemin-rengi:   #3a3a6a;
@@ -27,13 +28,13 @@
       --portal-rengi:  #ff4466;
     }
 
+    /*html ve body ekranı tam kaplayor flex ile içeriği hizalıyoruz*/
     html, body {
       width: 100%;
       height: 100%;
       background: var(--arkaplan);
       color: var(--yazi);
-      /* Monospace + geometrik font çifti */
-      font-family: 'Courier New', 'Lucida Console', monospace;
+      font-family: 'Courier New', 'Lucida Console', monospace; /* monospace kasıtlı retro his için */
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -41,7 +42,7 @@
       overflow: hidden;
     }
 
-    /* ─── Başlık bandı ─── */
+    /* #baslik-bant — üstteki ince şerit, başlık + hud bilgisi yan yana */
     #baslik-bant {
       width: 100%;
       padding: 10px 24px;
@@ -50,7 +51,7 @@
       justify-content: space-between;
       background: var(--panel-bg);
       border-bottom: 1px solid var(--panel-kenar);
-      user-select: none;
+      user-select: none; /*başlığı yanlışlıkla seçmesin */
     }
 
     #baslik-bant h1 {
@@ -60,111 +61,111 @@
       color: var(--vurgu);
     }
 
-    #baslik-bant h1 span {
-      color: var(--vurgu2);
-    }
+      /* span ile "nomy" kısmı pembeye çekiliyor — iki renkli logo efekti */
+      #baslik-bant h1 span {
+        color: var(--vurgu2);
+      }
 
-    /* ─── Durum göstergesi (HUD üstü) ─── */
+    /*#hud-satiri — oyun sırasında oda/dönüş/atlama bilgilerini gösterir */
     #hud-satiri {
       font-size: 0.75rem;
       color: var(--yazi-soluk);
       letter-spacing: 0.1em;
     }
 
-    #hud-satiri strong {
-      color: var(--yazi);
-    }
+      #hud-satiri strong {
+        color: var(--yazi); /* sayılar biraz daha parlak görünsün */
+      }
 
-    /* ─── Ana içerik: canvas + yan panel ─── */
-    #icerik {
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      gap: 16px;
-      padding: 16px;
-      width: 100%;
-      height: calc(100vh - 48px); /* başlık bandı çıkarılır */
-    }
+      /* #icerik — canvas ile yan panel yan yana oturuyor */
+      #icerik {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 16px;
+        padding: 16px;
+        width: 100%;
+        height: calc(100vh - 48px); /* başlık bandı kadar alan düşülüyor */
+      }
 
-    /* ─── Canvas kapsayıcısı — parlak kenarlık efekti ─── */
-    #canvas-kapsayici {
-      position: relative;
-      flex-shrink: 0;
-      border: 2px solid var(--panel-kenar);
-      border-radius: 4px;
-      box-shadow:
-        0 0 0 1px var(--vurgu),
-        0 0 24px 2px rgba(124, 106, 240, 0.25),
-        inset 0 0 12px rgba(0,0,0,0.6);
-      /* Canvas boyutu JS tarafından ayarlanır,
-         ama kapsayıcı o boyutu sarar */
-      line-height: 0; /* altında boşluk oluşmasın */
-    }
+        /* #canvas-kapsayici — canvas'ın etrafındaki parlak kenarlık buradan geliyor */
+        #canvas-kapsayici {
+          position: relative;
+          flex-shrink: 0;
+          border: 2px solid var(--panel-kenar);
+          border-radius: 4px;
+          box-shadow:
+            0 0 0 1px var(--vurgu),
+            0 0 24px 2px rgba(124, 106, 240, 0.25), /* mor ışıma */
+            inset 0 0 12px rgba(0,0,0,0.6);
+          line-height: 0; /* canvas altında boşluk çıkmasın, inline elementin numarası */
+        }
 
-    /* Eğer ses izni gerekmesi gibi overlay lazım olursa */
-    #baslangic-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(10, 10, 20, 0.88);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      border-radius: 4px;
-      gap: 16px;
-      cursor: pointer;
-      /* Oyun başlayınca JS ile hidden yapılır */
-      z-index: 10;
-    }
+  /* #baslangic-overlay — oyun başlamadan önce üstünde duran yarı saydam perde */
+  #baslangic-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 10, 20, 0.88);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    gap: 16px;
+    cursor: pointer;
+    z-index: 10;
+  }
 
+    /* .gizli — js bu sınıfı ekleyince overlay kayboluyor */
     #baslangic-overlay.gizli {
       display: none;
     }
 
-    #baslangic-overlay p {
-      font-size: 1rem;
-      letter-spacing: 0.15em;
-      color: var(--vurgu);
-      text-transform: uppercase;
-    }
+      #baslangic-overlay p {
+        font-size: 1rem;
+        letter-spacing: 0.15em;
+        color: var(--vurgu);
+        text-transform: uppercase;
+      }
 
-    #baslangic-overlay small {
-      font-size: 0.65rem;
-      color: var(--yazi-soluk);
-      letter-spacing: 0.1em;
-    }
+      #baslangic-overlay small {
+        font-size: 0.65rem;
+        color: var(--yazi-soluk);
+        letter-spacing: 0.1em;
+      }
 
-    /* Başla butonu */
-    #basla-btn {
-      padding: 10px 32px;
-      background: transparent;
-      border: 1px solid var(--vurgu);
-      color: var(--vurgu);
-      font-family: inherit;
-      font-size: 0.85rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      cursor: pointer;
-      border-radius: 2px;
-      transition: background 0.2s, color 0.2s;
-    }
+      /* #basla-btn — hover'da dolup rengi tersine çeviriyor */
+      #basla-btn {
+        padding: 10px 32px;
+        background: transparent;
+        border: 1px solid var(--vurgu);
+        color: var(--vurgu);
+        font-family: inherit;
+        font-size: 0.85rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        cursor: pointer;
+        border-radius: 2px;
+        transition: background 0.2s, color 0.2s;
+      }
 
     #basla-btn:hover {
       background: var(--vurgu);
       color: var(--arkaplan);
     }
 
-    /* ─── Yan bilgi paneli ─── */
-    #bilgi-panel {
-      width: 200px;
-      flex-shrink: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      font-size: 0.72rem;
-      letter-spacing: 0.05em;
-    }
+      /* #bilgi-panel — sağdaki dar panel, kontroller + oda haritası + açıklama */
+      #bilgi-panel {
+        width: 200px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        font-size: 0.72rem;
+        letter-spacing: 0.05em;
+      }
 
+    /* .panel-kutu — panel içindeki her bölüm bu kutuya giriyor */
     .panel-kutu {
       background: var(--panel-bg);
       border: 1px solid var(--panel-kenar);
@@ -182,32 +183,33 @@
       padding-bottom: 4px;
     }
 
-    /* Kontrol listesi */
-    .kontrol-satiri {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 5px;
-      color: var(--yazi);
-    }
+      /* .kontrol-satiri — tuş adı solda, kbd sağda */
+      .kontrol-satiri {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 5px;
+        color: var(--yazi);
+      }
 
-    .kontrol-satiri kbd {
-      background: var(--panel-kenar);
-      border: 1px solid var(--vurgu);
-      color: var(--vurgu);
-      padding: 1px 6px;
-      border-radius: 2px;
-      font-size: 0.68rem;
-      font-family: inherit;
-    }
+     .kontrol-satiri kbd {
+        background: var(--panel-kenar);
+        border: 1px solid var(--vurgu);
+        color: var(--vurgu);
+        padding: 1px 6px;
+        border-radius: 2px;
+        font-size: 0.68rem;
+        font-family: inherit;
+      }
 
-    /* Oda haritası önizlemesi (mini küp yüzeyleri) */
-    #oda-listesi {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 4px;
-    }
+      /* #oda-listesi — 3 sütunluk mini küp haritası, 6 oda için */
+      #oda-listesi {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4px;
+      }
 
+    /* .oda-mini — her küçük oda karesi */
     .oda-mini {
       aspect-ratio: 1;
       background: var(--panel-kenar);
@@ -221,71 +223,63 @@
       transition: border-color 0.15s;
     }
 
-    /* Aktif oda vurgusu — JS tarafından eklenir */
+    /* .aktif — js hangi odadaysa o mini kutuya bunu ekler */
     .oda-mini.aktif {
       border-color: var(--vurgu);
       color: var(--vurgu);
       background: rgba(124, 106, 240, 0.1);
     }
 
-    /* ─── Gizli ses elementleri ─── */
-    /* Ses elementleri DOM'da ama görünmez */
-    #ses-konteyner {
-      display: none;
-    }
+      /* #ses-konteyner — audio elemanları gizli tutuluyor, display:none yeterli */
+      #ses-konteyner {
+        display: none;
+      }
 
-    /* ─── Yükleniyor metni ─── */
-    #yukleniyor {
-      position: fixed;
-      inset: 0;
-      background: var(--arkaplan);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.8rem;
-      letter-spacing: 0.2em;
-      color: var(--yazi-soluk);
-      text-transform: uppercase;
-      z-index: 100;
-      transition: opacity 0.4s;
-    }
+      /* #yukleniyor — sayfa açılırken görünüyor, js hazır olunca .gizli eklenir */
+      #yukleniyor {
+        position: fixed;
+        inset: 0;
+        background: var(--arkaplan);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        color: var(--yazi-soluk);
+        text-transform: uppercase;
+        z-index: 100;
+        transition: opacity 0.4s;
+      }
 
+    /* .gizli — opacity:0 + pointer-events:none fade out gibi hissettirir*/
     #yukleniyor.gizli {
       opacity: 0;
       pointer-events: none;
-    }
-  </style>
-</head>
-<body>
+    }</style></head><body>
 
-  <!-- ─── Yükleniyor ekranı — JS hazır olunca gizlenir ─── -->
+  <!-- yükleniyor ekranı, js hazır olunca .gizli sınıfıyla solar -->
   <div id="yukleniyor">Yükleniyor…</div>
 
-  <!-- ─── Üst başlık bandı ─── -->
-  <header id="baslik-bant">
-    <h1>Holo<span>nomy</span></h1>
-    <!-- Dinamik durum bilgisi (JS tarafından güncellenir) -->
-    <div id="hud-satiri">
-      Oda: <strong id="hud-oda">1</strong> &nbsp;|&nbsp;
-      Dönüş: <strong id="hud-donus">0°</strong> &nbsp;|&nbsp;
-      Atlamalar: <strong id="hud-atlama">0</strong>
-    </div>
-  </header>
+  <!-- üst başlık bandı — başlık solda, hud bilgisi sağda -->
+    <header id="baslik-bant">
+      <h1>Holo<span>nomy</span></h1>
+      <!-- bu alandaki strong'lar js tarafından her karede güncelleniyor -->
+      <div id="hud-satiri">
+        Oda: <strong id="hud-oda">1</strong> &nbsp;|&nbsp;
+        Dönüş: <strong id="hud-donus">0°</strong> &nbsp;|&nbsp;
+        Atlamalar: <strong id="hud-atlama">0</strong>
+      </div>
+    </header>
 
-  <!-- ─── Ana oyun alanı ─── -->
+  <!-- ana oyun alanı — canvas ve yan panel burada yan yana oturuyor -->
   <div id="icerik">
 
-    <!-- Canvas kapsayıcısı -->
     <div id="canvas-kapsayici">
 
-      <!--
-        Oyun canvas'ı.
-        Boyutlar: 800 × 480 piksel (20 sütun × 12 satır, her hücre 40px)
-        Kesin değerler oyun.js içinde HUCRE_BOY sabiti ile tanımlanır.
-      -->
+      <!-- canvas boyutları sabit (800x480), hücre hesapları oyun.js'de -->
       <canvas id="oyunCanvas" width="800" height="480"></canvas>
 
-      <!-- Başlangıç overlay'i — tıklanınca ses başlar ve oyun devreye girer -->
+      <!-- başlangıç perdesi — tıklanınca hem ses izni alınır hem overlay kalkar -->
       <div id="baslangic-overlay">
         <p>Holonomy</p>
         <small>Küp yüzeylerinde platform bulmacası</small>
@@ -293,12 +287,11 @@
         <small>← → veya A/D: hareket &nbsp;|&nbsp; ↑ / W / Boşluk: zıpla</small>
       </div>
 
-    </div><!-- /canvas-kapsayici -->
+    </div>
 
-    <!-- ─── Yan bilgi paneli ─── -->
+    <!-- sağ panel: kontroller, oda haritası, kısa açıklama -->
     <aside id="bilgi-panel">
 
-      <!-- Kontroller -->
       <div class="panel-kutu">
         <h2>Kontroller</h2>
         <div class="kontrol-satiri">
@@ -315,21 +308,19 @@
         </div>
       </div>
 
-      <!-- Oda haritası mini göstergesi -->
-      <div class="panel-kutu">
-        <h2>Odalar</h2>
-        <div id="oda-listesi">
-          <!-- 6 oda mini kutusu — JS tarafından aktif sınıfı yönetilir -->
-          <div class="oda-mini aktif" id="oda-mini-1">1</div>
-          <div class="oda-mini"       id="oda-mini-2">2</div>
-          <div class="oda-mini"       id="oda-mini-3">3</div>
-          <div class="oda-mini"       id="oda-mini-4">4</div>
-          <div class="oda-mini"       id="oda-mini-5">5</div>
-          <div class="oda-mini"       id="oda-mini-6">6</div>
+        <!-- 6 oda var, .aktif sınıfı js tarafından hangi odadaysan ona eklenir -->
+        <div class="panel-kutu">
+          <h2>Odalar</h2>
+          <div id="oda-listesi">
+            <div class="oda-mini aktif" id="oda-mini-1">1</div>
+            <div class="oda-mini"       id="oda-mini-2">2</div>
+            <div class="oda-mini"       id="oda-mini-3">3</div>
+            <div class="oda-mini"       id="oda-mini-4">4</div>
+            <div class="oda-mini"       id="oda-mini-5">5</div>
+            <div class="oda-mini"       id="oda-mini-6">6</div>
+          </div>
         </div>
-      </div>
 
-      <!-- Kısa açıklama -->
       <div class="panel-kutu">
         <h2>Hakkında</h2>
         <p style="color:var(--yazi-soluk); line-height:1.5">
@@ -338,22 +329,18 @@
         </p>
       </div>
 
-    </aside><!-- /bilgi-panel -->
+    </aside>
 
-  </div><!-- /icerik -->
+  </div>
 
-  <!-- ─── Ses elementleri (gizli) ─── -->
-  <!--
-    Ses dosyaları oyunla aynı klasörde olmalı.
-    Eğer dosyalar yoksa console uyarısı verir ama oyun çalışmaya devam eder.
-  -->
+  <!-- ses dosyaları — muzik.mp3, gecis.mp3, hedef.mp3 aynı klasörde olmalı -->
   <div id="ses-konteyner">
     <audio id="ses-muzik"  src="muzik.mp3"  loop  preload="auto"></audio>
     <audio id="ses-gecis"  src="gecis.mp3"        preload="auto"></audio>
     <audio id="ses-hedef"  src="hedef.mp3"         preload="auto"></audio>
   </div>
 
-  <!-- ─── Scriptler — önce harita, sonra oyun mantığı ─── -->
+  <!-- önce harita verisi yükleniyor, sonra oyun mantığı — sıra önemli -->
   <script src="harita.js"></script>
   <script src="oyun.js"></script>
 
